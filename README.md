@@ -6,7 +6,39 @@ this app was originaly made just for me but feel free to use it if you want. i p
 
 A cozy pixel-art pocket aquarium for your phone. Keep fish, shrimp and jellyfish, feed them, keep the water clean, breed new colors and hybrids, and fill your collection book.
 
-Everything is plain HTML, CSS and JavaScript (canvas pixel art, synthesized sound, no images, no libraries). The build step just glues the source files into **one self-contained HTML file**.
+Everything is plain HTML, CSS and JavaScript (canvas pixel art, synthesized sound, no libraries). The build step just glues the source files into **one self-contained HTML file**.
+
+## Play it on your phone
+
+**Play here:** https://merchok.github.io/FishTankIdle/
+
+You can add Finlings to your home screen so it looks and works like a normal app: full screen, with its own icon, and it even works **without internet**.
+
+### iPhone (Safari)
+
+You have to use **Safari** (not Chrome) for this.
+
+1. Open the link above in **Safari** and wait for the game to load.
+2. Tap the **Share** button (the square with an arrow pointing up, at the bottom of the screen).
+3. Scroll down and tap **Add to Home Screen**.
+4. Tap **Add** (top right).
+5. Open Finlings from the new fish icon on your home screen. Done!
+
+### Android (Chrome)
+
+1. Open the link above in **Chrome** and wait for the game to load.
+2. Tap the **three dots** menu (top right).
+3. Tap **Install app** (or **Add to Home screen** if you don't see that).
+4. Tap **Install**.
+5. Open Finlings from the new fish icon. Done!
+
+### Good to know
+
+- **Open it with internet the first time.** That is when the game saves itself to your phone. After that it works offline.
+- **Always open it from the home screen icon** once you have installed it.
+- **Updates happen by themselves.** When a new version comes out, you get it the next time you open the game with internet (sometimes it takes one extra open).
+- **Your tank is saved on your phone only.** Nothing is uploaded anywhere. Playing in the browser and playing from the home screen icon can have *separate* tanks.
+- **Want to keep or move your tank?** Open **Settings** in the game, find **Backup**, and copy the code. Paste it into the **Restore** box on another device (or in the other app) to bring your tank over. Keep the code somewhere safe, it is your whole tank.
 
 ## Build
 
@@ -34,18 +66,6 @@ GitHub Pages only serves files, it never runs a build, so the build always happe
 
 1. **Automatic (recommended):** `.github/workflows/pages.yml` runs `bash build.sh` on GitHub whenever you push to `main` and publishes `dist/`. One-time setup: repo Settings > Pages > Source: **GitHub Actions**.
 2. **Manual:** run `bash build.sh` yourself and publish `dist/index.html` (for example copy it to the repo root or to `/docs` and point Pages at that).
-
-## Install it as an app (iPhone)
-
-Once the site is live on GitHub Pages it can be installed and played offline:
-
-1. Open the site in **Safari** while online (once is enough, the game caches itself).
-2. Tap **Share**, then **Add to Home Screen**.
-3. Launch it from the new icon. It opens full screen and works with no connection.
-
-When a new version is published, the app picks it up the next time you open it while online.
-
-**Your save lives in the browser or app you play in.** The Safari tab and the home-screen app can keep separate saves, so use **Settings > Backup** to copy a backup code and paste it into the other one (or keep it as a safety net). The code is just your save packed into text, nothing is uploaded anywhere.
 
 ## Where things are
 
