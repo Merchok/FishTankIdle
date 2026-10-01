@@ -432,7 +432,7 @@ function htmlBook(){
 }
 
 /* ---------- sheets ---------- */
-function openSheet(kind,arg){sheetState={kind,arg:arg??null,armed:false};renderSheet();}
+function openSheet(kind,arg){sheetState={kind,arg:arg??null,armed:false};renderSheet();if(kind==='settings') prepareBackup();}
 function closeSheet(){
   const was=sheetState&&sheetState.kind;
   sheetState=null;$('#sheet').hidden=true;
@@ -537,9 +537,102 @@ function sheetAway(a){
     <p class="hint">${a.label}</p><ul class="tidy">${lines.join('')}</ul>
     <button class="btn primary" data-act="close">Check on the tank</button>`;
 }
+/* ---------- backup code: move or rescue your tank as plain text ---------- */
+const bkEsc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const bkBad=m=>{const e=new Error(m);e.userMsg=m;return e;};
+function bkB64(u8){let s='';for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s);}
+function bkUnB64(str){const s=atob(str),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i);return u;}
+async function makeBackupCode(){
+  const bytes=new TextEncoder().encode(serialize());
+  if(typeof CompressionStream!=='undefined'){
+    try{
+      const cs=new CompressionStream('gzip'),w=cs.writable.getWriter();
+      w.write(bytes);w.close();
+      return 'FIN1z:'+bkB64(new Uint8Array(await new Response(cs.readable).arrayBuffer()));
+    }catch(e){}
+  }
+  return 'FIN1:'+bkB64(bytes);
+}
+async function readBackupCode(text){
+  const m=/^FIN1(z?):([A-Za-z0-9+/=]+)$/.exec(String(text||'').replace(/\s+/g,''));
+  if(!m) throw bkBad('That does not look like a Finlings backup code.');
+  let bytes;
+  try{bytes=bkUnB64(m[2]);}catch(e){throw bkBad('The code is damaged. Check that you copied all of it.');}
+  if(m[1]==='z'){
+    if(typeof DecompressionStream==='undefined') throw bkBad('This browser cannot open that code.');
+    const ds=new DecompressionStream('gzip'),w=ds.writable.getWriter();
+    w.write(bytes);w.close();
+    bytes=new Uint8Array(await new Response(ds.readable).arrayBuffer());
+  }
+  let o;
+  try{o=JSON.parse(new TextDecoder().decode(bytes));}catch(e){throw bkBad('The code is damaged. Check that you copied all of it.');}
+  if(!o||!Array.isArray(o.fish)) throw bkBad('That code is not from Finlings.');
+  return o;
+}
+function prepareBackup(){
+  makeBackupCode().then(c=>{if(sheetState&&sheetState.kind==='settings') sheetState.code=c;}).catch(()=>{});
+}
+function backupHtml(){
+  const b=sheetState;
+  return `<div class="kv"><h2 class="sec-title" style="margin:0">Backup</h2>
+    <p class="hint">Your tank is stored on this device. A backup code lets you move it to another device, or get it back if the app is ever wiped. Keep it in Notes or email it to yourself.</p>
+    <div class="actions"><button class="btn" data-act="backup-copy">Copy backup code</button><button class="btn ${b.restore?'primary':''}" data-act="backup-restore-open">Restore from code</button></div>
+    ${b.showCode&&b.code?`<textarea class="codebox" readonly rows="4" onfocus="this.select()" aria-label="Your backup code">${bkEsc(b.code)}</textarea>`:''}
+    ${b.restore?`<textarea class="codebox" id="restoreBox" rows="4" placeholder="Paste your backup code here" aria-label="Paste a backup code">${bkEsc(b.restoreText||'')}</textarea>
+    <button class="btn ${b.pending?'danger':'primary'}" data-act="backup-restore-go">${b.pending?'Tap again to replace this tank':'Restore this tank'}</button>`:''}
+    ${b.msg?`<p class="hint">${bkEsc(b.msg)}</p>`:''}</div>`;
+}
+function backupCopy(){
+  const st=sheetState;if(!st) return;
+  const shown=ok=>{
+    if(sheetState!==st) return;
+    st.showCode=true;
+    st.msg=ok?'Copied. Paste it somewhere safe, like Notes.':'Tap the box, then copy the code and keep it somewhere safe.';
+    renderSheet(true);
+  };
+  const go=code=>{
+    st.code=code;
+    let p=null;
+    try{p=navigator.clipboard.writeText(code);}catch(e){}
+    if(p&&p.then) p.then(()=>shown(true),()=>shown(false)); else shown(false);
+  };
+  if(st.code) go(st.code);
+  else makeBackupCode().then(go).catch(()=>{toast('Could not make a backup code.');sfx.error();});
+}
+async function backupRestoreGo(){
+  const st=sheetState;if(!st) return;
+  if(st.pending){const o=st.pending;closeSheet();applyRestored(o);return;}
+  try{
+    const box=$('#restoreBox');
+    st.restoreText=box?box.value:(st.restoreText||'');
+    if(st.restoreText.length>3000000) throw bkBad('That code is too long to be a Finlings backup.');
+    const o=await readBackupCode(st.restoreText);
+    st.pending=o;
+    st.msg=`Found a tank with ${o.fish.length} ${plural(o.fish.length,'creature')} and ${Math.floor(+o.coins||0)} coins. Restoring replaces the tank you have now.`;
+  }catch(e){
+    st.pending=null;
+    st.msg=(e&&e.userMsg)||'That code did not work. Check that you pasted all of it.';
+    sfx.error();
+  }
+  if(sheetState===st) renderSheet(true);
+}
+function applyRestored(o){
+  JUICE_ON=false;
+  S=normalize(o);
+  S.lastSeen=Date.now();S.seenWelcome=true;
+  breedSel={a:null,b:null};
+  scene.rt.clear();scene.food.length=0;scene.parts.length=0;scene.ripples.length=0;
+  scene.vw=scene.va=scene.pileN=null;scene.wipe=scene.swirl=scene.rinse=null;
+  lastSimAt=Date.now();
+  afterLoad();
+  saveNow();
+  toast('Tank restored.');
+}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='restoreBox'&&sheetState) sheetState.restoreText=e.target.value;});
 function sheetSettings(){
   return `<div class="hd"><h3 data-act="dev-tap">Settings</h3><button class="x" data-act="close" aria-label="Close">×</button></div>
     <div class="kv"><h2 class="sec-title" style="margin:0">Saving</h2><p class="hint">${saveState.status}</p></div>
+    ${backupHtml()}
     ${devOn?`<div class="kv"><h2 class="sec-title" style="margin:0">Developer</h2><p class="hint">Test tools. Time jumps forward on the spot.</p>
     <div class="actions"><button class="btn" data-act="ff" data-m="60">+1 hour</button><button class="btn" data-act="ff" data-m="480">+8 hours</button><button class="btn" data-act="ff" data-m="1440">+1 day</button></div></div>`:''}
     <div class="kv"><h2 class="sec-title" style="margin:0">Start over</h2>
@@ -708,6 +801,9 @@ function onAct(el){
       sfx.buy();S.coins-=t.price;S.themes[id]=1;S.theme=id;toast(`${t.n} is now your backdrop.`);changed();renderTab('shop');break;
     }
     case 'use-theme': S.theme=id;changed();renderTab('shop');break;
+    case 'backup-copy': backupCopy();break;
+    case 'backup-restore-open': sheetState.restore=!sheetState.restore;sheetState.pending=null;sheetState.msg='';renderSheet(true);break;
+    case 'backup-restore-go': backupRestoreGo();break;
     case 'dev-tap': {
       clearTimeout(devTimer);devTimer=setTimeout(()=>{devTaps=0;},1800);
       devTaps++;
