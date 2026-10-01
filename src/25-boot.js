@@ -138,4 +138,10 @@ function boot(startFn){
     else startFn();
   }catch(e){startFn();}
 }
+/* offline support: only on a real web address, never on file:// or inside the Claude sandbox */
+try{
+  if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)&&!window.claude){
+    window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+  }
+}catch(e){}
 boot(start);

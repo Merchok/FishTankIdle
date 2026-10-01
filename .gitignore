@@ -1,4 +1,6 @@
 node_modules/
 __pycache__/
-*.png
 .DS_Store
+# screenshots from local test runs (the app icons in src/icons and dist/icons are tracked)
+/*.png
+tests/*.png
