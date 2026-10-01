@@ -439,25 +439,17 @@ function closeSheet(){
   if(was==='away'&&S&&(S.news||0)<NEWS_V){const prev=S.news||0;S.news=NEWS_V;openSheet('news',prev);return;}
   if(curTab!=='tank') renderTab(curTab);
 }
-/* ---------- DNA view: one rung per trait, one gene on each strand ---------- */
-const HX={R:60,W:84,A:28,P:3,PAD:10,TURN:6}; // row height, helix width, strand swing, pixel size, end padding, rows per full twist
-const HX_HUES=['#5fc3f2','#ffb347','#8fe08f','#c79bff','#ff8fa3','#ffe27a','#59d9c8','#b9c4ff'];
-const HX_SHEEN=['#3b5a78','#fff3a0','#f4f0ff'];
+/* ---------- DNA view: one rung per trait. What shows is on the left of the rung, what hides is dim on the right ---------- */
+const HX={R:44,W:60,A:18,P:3,PAD:10,TURN:5}; // row height, helix width, strand swing, pixel size, end padding, rows per full twist
+const HX_SHOW='#ffb347',HX_SHEEN=['#8fa9be','#fff3a0','#f4f0ff'];
 let hxRows=null,hxPhase=0.6,hxRaf=0,hxLast=0;
-/* what one trait looks like to the player: its name, what shows, and the two genes with their state */
+/* one trait for the player: what shows, and any gene it carries without showing */
 function geneInfo(f,k){
   const L=LD(kindOf(f),k),pair=f.g[k],o=L.opts,isCol=k==='color'||k==='accent';
-  let v=-1,res;
-  if(k==='size') res=SIZE_NAMES[pair[0]+pair[1]];
-  else{
-    v=k==='sheen'?((pair[0]===pair[1]&&pair[0]>0)?pair[0]:0):expr(k,pair);
-    res=o[v].n;
-  }
-  const hue=i=>isCol?o[i].c:(k==='sheen'?HX_SHEEN[i]:HX_HUES[i%HX_HUES.length]);
-  return {label:L.label,res,genes:pair.map(i=>{
-    const on=k==='size'||i===v;
-    return {n:o[i].n,c:hue(i),sw:isCol?o[i].c:null,rare:!!o[i].r,on,tag:k==='size'?'blends':(on?'shows':'carried')};
-  })};
+  const gene=i=>({n:o[i].n,c:isCol?o[i].c:(k==='sheen'?HX_SHEEN[i]:HX_SHOW),sw:isCol?o[i].c:null,rare:!!o[i].r});
+  if(k==='size') return {label:L.label,shown:{n:SIZE_NAMES[pair[0]+pair[1]],c:HX_SHOW,sw:null,rare:false},hidden:[],note:pair[0]!==pair[1]?o[pair[0]].n+' + '+o[pair[1]].n:''};
+  const v=k==='sheen'?((pair[0]===pair[1]&&pair[0]>0)?pair[0]:0):expr(k,pair);
+  return {label:L.label,shown:gene(v),hidden:pair.filter(i=>i!==v).map(gene),note:''};
 }
 /* the helix itself, drawn as chunky pixels. phase turns it. */
 function helixInner(rows,phase){
@@ -474,14 +466,15 @@ function helixInner(rows,phase){
   }
   let rungs='',pads='';
   rows.forEach((r,i)=>{
-    const y=snap(PAD+i*R+36),half=Math.max(P*3,Math.abs(Math.cos(th(y)))*A);
+    const y=snap(PAD+i*R+R/2),half=Math.max(P*3,Math.abs(Math.cos(th(y)))*A);
     const xl=snap(cx-half),xr=snap(cx+half);
-    r.genes.forEach((g,side)=>{
-      const glint=g.rare?0.8+0.2*Math.sin(phase*4+i):1;
-      const op=(g.on?1:0.4)*glint;
+    const sides=[{g:r.shown,dim:false},r.hidden.length?{g:r.hidden[0],dim:true}:{g:r.shown,dim:false}];
+    sides.forEach((s,side)=>{
+      const glint=s.g.rare?0.8+0.2*Math.sin(phase*4+i):1;
+      const op=((s.dim)?0.4:1)*glint;
       const x0=side?cx:xl,w=side?xr-cx:cx-xl,xe=side?xr:xl;
-      rungs+=px(x0,y-P,w,P*2,'',`fill="${g.c}" opacity="${op.toFixed(2)}"`);
-      pads+=px(xe-P,y-P*2,P*2,P*4,'',`fill="${g.c}" opacity="${op.toFixed(2)}"`);
+      rungs+=px(x0,y-P,w,P*2,'',`fill="${s.g.c}" opacity="${op.toFixed(2)}"`);
+      pads+=px(xe-P,y-P*2,P*2,P*4,'',`fill="${s.g.c}" opacity="${op.toFixed(2)}"`);
     });
   });
   return back+rungs+front+pads;
@@ -490,12 +483,15 @@ function geneBlock(f){
   const rows=lociOf(kindOf(f)).map(k=>geneInfo(f,k));
   hxRows=rows;
   const {W,R,PAD}=HX,H=rows.length*R+PAD*2;
-  const chip=(g,side)=>`<div class="hx-a ${side} ${g.on?'on':'off'}${g.rare?' rare':''}"><b>${g.sw?`<i class="sw" style="background:${g.sw}"></i>`:''}${g.n}</b><small>${g.tag}</small></div>`;
-  const body=rows.map(r=>`<div class="hx-row"><div class="hx-k">${r.label}<b>${r.res}</b></div>${chip(r.genes[0],'hx-l')}<i></i>${chip(r.genes[1],'hx-r')}</div>`).join('');
+  const sw=g=>g.sw?`<i class="sw" style="background:${g.sw}"></i>`:'';
+  const body=rows.map(r=>{
+    const s=r.shown;
+    const hid=r.hidden.length?`<span class="hx-hid${r.hidden.some(g=>g.rare)?' rare':''}">carries ${r.hidden.map(g=>sw(g)+g.n).join(' + ')}</span>`:(r.note?`<span class="hx-hid">${r.note}</span>`:'');
+    return `<div class="hx-row"><span class="hx-k">${r.label}</span><span class="hx-v"><b${s.rare?' class="rare"':''}>${sw(s)}${s.n}${s.rare?'<small>rare</small>':''}</b>${hid}</span></div>`;
+  }).join('');
   return `<div class="kv"><h2 class="sec-title" style="margin:0">Genes</h2>
-      <p class="hint">Every trait has two genes, one on each side of the DNA. The bright one shows on the creature.</p>
-      <div class="helix"><svg class="hx-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" shape-rendering="crispEdges" aria-hidden="true">${helixInner(rows,hxPhase)}</svg>${body}</div>
-      <p class="hint">Dim genes are carried. They stay hidden, but babies can still get them. Two matching genes are passed on every time.</p></div>`;
+      <p class="hint">Each trait has two genes. One shows. The other can hide, and babies can still get it.</p>
+      <div class="helix"><svg class="hx-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" shape-rendering="crispEdges" aria-hidden="true">${helixInner(rows,hxPhase)}</svg>${body}</div></div>`;
 }
 /* slow twist while a creature sheet is open */
 function hxTick(now){
