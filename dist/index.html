@@ -188,6 +188,24 @@ h2,h3,h4,p{margin:0}
 .kv{display:flex;flex-direction:column;gap:8px}
 .kv .r{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:start}
 .kv .r>span{font-family:var(--font-label);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:5px}
+/* DNA view */
+.helix{position:relative;padding:10px 8px;background:linear-gradient(#0a1624,#0c1c2e);border:2px solid var(--ink-deep);border-radius:6px}
+.hx-svg{position:absolute;left:50%;top:0;transform:translateX(-50%);pointer-events:none}
+.hx-svg .hx-b{fill:#244b73}
+.hx-svg .hx-f{fill:#8fcdf6}
+.hx-row{display:grid;grid-template-columns:minmax(0,1fr) 84px minmax(0,1fr);grid-template-rows:16px 40px;height:60px}
+.hx-k{grid-column:1/-1;align-self:end;padding-bottom:2px;display:flex;align-items:baseline;gap:8px;font-family:var(--font-label);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hx-k b{font-family:var(--font-ui);font-size:13px;letter-spacing:0;text-transform:none;color:var(--accent);font-weight:400}
+.hx-a{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1px;padding:0 8px;background:#0d1b2c;border:2px solid var(--line);border-radius:4px}
+.hx-a.hx-l{align-items:flex-end;text-align:right}
+.hx-a.hx-r{align-items:flex-start;text-align:left}
+.hx-a b{display:inline-flex;align-items:center;gap:5px;max-width:100%;font-weight:400;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hx-a small{font-family:var(--font-label);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hx-a .sw{flex:none;width:10px;height:10px;border:1px solid rgba(0,0,0,.5)}
+.hx-a.on{border-color:var(--accent);background:#1d2a33}
+.hx-a.on small{color:var(--accent)}
+.hx-a.off{border-style:dashed;opacity:.62}
+.hx-a.rare{box-shadow:inset 0 0 0 1px rgba(255,226,122,.55)}
 .toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(92vw,420px);padding:10px 16px;background:var(--accent);color:var(--accent-ink);border:2px solid #ffd9a0;border-radius:4px;font-weight:600;z-index:40;text-align:center;box-shadow:0 3px 0 var(--ink-deep)}
 ul.tidy{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
 @media (max-width:460px){.brand small{display:none}}
@@ -2715,17 +2733,73 @@ function closeSheet(){
   if(was==='away'&&S&&(S.news||0)<NEWS_V){const prev=S.news||0;S.news=NEWS_V;openSheet('news',prev);return;}
   if(curTab!=='tank') renderTab(curTab);
 }
-function geneRow(f,k){
-  const kind=kindOf(f),L=LD(kind,k),pair=f.g[k],o=L.opts,same=pair[0]===pair[1];
-  let dom=-1;
-  if(k==='sheen') dom=(same&&pair[0]>0)?pair[0]:0;
-  else if(k!=='size') dom=expr(k,pair);
-  return `<div class="r"><span>${L.label}</span><div class="chips">${pair.map(i=>`<span class="chip ${(same&&k!=='size')||i===dom?'dom':''} ${o[i].r?'rare':''}">${(k==='color'||k==='accent')?`<i class="sw" style="background:${o[i].c}"></i>`:''}${o[i].n}</span>`).join('')}</div></div>`;
+/* ---------- DNA view: one rung per trait, one gene on each strand ---------- */
+const HX={R:60,W:84,A:28,P:3,PAD:10,TURN:6}; // row height, helix width, strand swing, pixel size, end padding, rows per full twist
+const HX_HUES=['#5fc3f2','#ffb347','#8fe08f','#c79bff','#ff8fa3','#ffe27a','#59d9c8','#b9c4ff'];
+const HX_SHEEN=['#3b5a78','#fff3a0','#f4f0ff'];
+let hxRows=null,hxPhase=0.6,hxRaf=0,hxLast=0;
+/* what one trait looks like to the player: its name, what shows, and the two genes with their state */
+function geneInfo(f,k){
+  const L=LD(kindOf(f),k),pair=f.g[k],o=L.opts,isCol=k==='color'||k==='accent';
+  let v=-1,res;
+  if(k==='size') res=SIZE_NAMES[pair[0]+pair[1]];
+  else{
+    v=k==='sheen'?((pair[0]===pair[1]&&pair[0]>0)?pair[0]:0):expr(k,pair);
+    res=o[v].n;
+  }
+  const hue=i=>isCol?o[i].c:(k==='sheen'?HX_SHEEN[i]:HX_HUES[i%HX_HUES.length]);
+  return {label:L.label,res,genes:pair.map(i=>{
+    const on=k==='size'||i===v;
+    return {n:o[i].n,c:hue(i),sw:isCol?o[i].c:null,rare:!!o[i].r,on,tag:k==='size'?'blends':(on?'shows':'carried')};
+  })};
+}
+/* the helix itself, drawn as chunky pixels. phase turns it. */
+function helixInner(rows,phase){
+  const {R,W,A,P,PAD,TURN}=HX,H=rows.length*R+PAD*2,cx=W/2;
+  const th=y=>(y-PAD)/(R*TURN)*Math.PI*2+phase;
+  const snap=v=>Math.round(v/P)*P;
+  const px=(x,y,w,h,cls,extra)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" ${cls?`class="${cls}"`:''} ${extra||''}/>`;
+  let back='',front='';
+  for(let y=0;y<H;y+=P){
+    const t=th(y+P/2),c=Math.cos(t)*A,aFront=Math.sin(t)>0;
+    const xa=snap(cx+c)-P,xb=snap(cx-c)-P;
+    front+=px(aFront?xa:xb,y,P*2,P,'hx-f');
+    back+=px(aFront?xb:xa,y,P*2,P,'hx-b');
+  }
+  let rungs='',pads='';
+  rows.forEach((r,i)=>{
+    const y=snap(PAD+i*R+36),half=Math.max(P*3,Math.abs(Math.cos(th(y)))*A);
+    const xl=snap(cx-half),xr=snap(cx+half);
+    r.genes.forEach((g,side)=>{
+      const glint=g.rare?0.8+0.2*Math.sin(phase*4+i):1;
+      const op=(g.on?1:0.4)*glint;
+      const x0=side?cx:xl,w=side?xr-cx:cx-xl,xe=side?xr:xl;
+      rungs+=px(x0,y-P,w,P*2,'',`fill="${g.c}" opacity="${op.toFixed(2)}"`);
+      pads+=px(xe-P,y-P*2,P*2,P*4,'',`fill="${g.c}" opacity="${op.toFixed(2)}"`);
+    });
+  });
+  return back+rungs+front+pads;
 }
 function geneBlock(f){
-  return `<div class="kv"><h2 class="sec-title" style="margin:0">Genes</h2>${lociOf(kindOf(f)).map(k=>geneRow(f,k)).join('')}
-      <p class="hint">Highlighted genes show on the creature. The other gene is carried and can be passed on.</p></div>`;
+  const rows=lociOf(kindOf(f)).map(k=>geneInfo(f,k));
+  hxRows=rows;
+  const {W,R,PAD}=HX,H=rows.length*R+PAD*2;
+  const chip=(g,side)=>`<div class="hx-a ${side} ${g.on?'on':'off'}${g.rare?' rare':''}"><b>${g.sw?`<i class="sw" style="background:${g.sw}"></i>`:''}${g.n}</b><small>${g.tag}</small></div>`;
+  const body=rows.map(r=>`<div class="hx-row"><div class="hx-k">${r.label}<b>${r.res}</b></div>${chip(r.genes[0],'hx-l')}<i></i>${chip(r.genes[1],'hx-r')}</div>`).join('');
+  return `<div class="kv"><h2 class="sec-title" style="margin:0">Genes</h2>
+      <p class="hint">Every trait has two genes, one on each side of the DNA. The bright one shows on the creature.</p>
+      <div class="helix"><svg class="hx-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" shape-rendering="crispEdges" aria-hidden="true">${helixInner(rows,hxPhase)}</svg>${body}</div>
+      <p class="hint">Dim genes are carried. They stay hidden, but babies can still get them. Two matching genes are passed on every time.</p></div>`;
 }
+/* slow twist while a creature sheet is open */
+function hxTick(now){
+  hxRaf=0;
+  const el=document.querySelector('.hx-svg');
+  if(!el||!hxRows) return;
+  if(now-hxLast>=70){hxLast=now;hxPhase+=0.055;el.innerHTML=helixInner(hxRows,hxPhase);}
+  hxRaf=requestAnimationFrame(hxTick);
+}
+function hxStart(){if(!hxRaf&&!REDUCED&&document.querySelector('.hx-svg')) hxRaf=requestAnimationFrame(hxTick);}
 function sheetFish(f){
   const sp=SP[f.sp],kind=kindOf(f),st=stageOf(f),inc=incomePerHour(f),tr=TRAIT[f.trait];
   const nextAge=st<2?fmtDur(STAGE_AGE[st]-f.age):'';
@@ -2956,6 +3030,7 @@ function renderSheet(soft){
   p.innerHTML=html;
   $('#sheet').hidden=false;
   paintAllCanvases(p);
+  hxStart();
   if(soft) p.scrollTop=st;
 }
 

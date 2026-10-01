@@ -170,6 +170,24 @@ h2,h3,h4,p{margin:0}
 .kv{display:flex;flex-direction:column;gap:8px}
 .kv .r{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:start}
 .kv .r>span{font-family:var(--font-label);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:5px}
+/* DNA view */
+.helix{position:relative;padding:10px 8px;background:linear-gradient(#0a1624,#0c1c2e);border:2px solid var(--ink-deep);border-radius:6px}
+.hx-svg{position:absolute;left:50%;top:0;transform:translateX(-50%);pointer-events:none}
+.hx-svg .hx-b{fill:#244b73}
+.hx-svg .hx-f{fill:#8fcdf6}
+.hx-row{display:grid;grid-template-columns:minmax(0,1fr) 84px minmax(0,1fr);grid-template-rows:16px 40px;height:60px}
+.hx-k{grid-column:1/-1;align-self:end;padding-bottom:2px;display:flex;align-items:baseline;gap:8px;font-family:var(--font-label);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hx-k b{font-family:var(--font-ui);font-size:13px;letter-spacing:0;text-transform:none;color:var(--accent);font-weight:400}
+.hx-a{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1px;padding:0 8px;background:#0d1b2c;border:2px solid var(--line);border-radius:4px}
+.hx-a.hx-l{align-items:flex-end;text-align:right}
+.hx-a.hx-r{align-items:flex-start;text-align:left}
+.hx-a b{display:inline-flex;align-items:center;gap:5px;max-width:100%;font-weight:400;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hx-a small{font-family:var(--font-label);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hx-a .sw{flex:none;width:10px;height:10px;border:1px solid rgba(0,0,0,.5)}
+.hx-a.on{border-color:var(--accent);background:#1d2a33}
+.hx-a.on small{color:var(--accent)}
+.hx-a.off{border-style:dashed;opacity:.62}
+.hx-a.rare{box-shadow:inset 0 0 0 1px rgba(255,226,122,.55)}
 .toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(92vw,420px);padding:10px 16px;background:var(--accent);color:var(--accent-ink);border:2px solid #ffd9a0;border-radius:4px;font-weight:600;z-index:40;text-align:center;box-shadow:0 3px 0 var(--ink-deep)}
 ul.tidy{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
 @media (max-width:460px){.brand small{display:none}}
