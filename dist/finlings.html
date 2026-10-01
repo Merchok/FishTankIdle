@@ -1,0 +1,3163 @@
+<title>Finlings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Silkscreen&display=swap">
+<style>
+/* Layout concept: a pocket aquarium. Tank window on top, care panel under it, handheld-style tab bar at the bottom. */
+:root{
+  --bg:#0d1b2b;
+  --panel:#15283d;
+  --panel2:#1d3551;
+  --ink-deep:#091420;
+  --line:#2c4b6c;
+  --fg:#e8f0f6;
+  --muted:#8fa9be;
+  --accent:#ffb347;
+  --accent-ink:#2b1a00;
+  --good:#62d58b;
+  --warn:#ffd166;
+  --bad:#ff7070;
+  --water:#45b7e0;
+  --font-ui:'Pixelify Sans',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --font-label:'Silkscreen',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+html{box-sizing:border-box}
+body{
+  margin:0;padding-inline:16px;padding-block:10px;
+  background:var(--bg);color:var(--fg);
+  font-family:var(--font-ui);font-size:16px;line-height:1.35;
+  overflow:hidden;-webkit-tap-highlight-color:transparent;
+}
+#app{width:100%;max-width:560px;height:100%;margin-inline:auto;display:flex;flex-direction:column;gap:10px;min-height:0}
+button{font:inherit;color:inherit}
+h2,h3,h4,p{margin:0}
+.ic{display:block;flex:none;image-rendering:pixelated}
+
+/* header */
+.top{display:flex;align-items:center;gap:10px;min-width:0}
+.brand{font-weight:600;font-size:22px;letter-spacing:.02em;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.brand small{font-family:var(--font-label);font-size:9px;letter-spacing:.12em;color:var(--muted);margin-left:8px;text-transform:uppercase}
+.coins{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--panel);border:2px solid var(--line);border-radius:4px;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.iconbtn{width:44px;height:44px;display:grid;place-items:center;background:var(--panel);border:2px solid var(--line);border-radius:4px;color:var(--muted);cursor:pointer;box-shadow:0 3px 0 var(--ink-deep)}
+.iconbtn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink-deep)}
+
+/* main scroller */
+#main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.tab{display:none;flex-direction:column;gap:12px}
+.tab.on{display:flex}
+.sec-title{font-family:var(--font-label);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.hint{color:var(--muted);font-size:14px}
+.card{background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:12px}
+
+/* tank */
+.tankwrap{border:4px solid var(--line);border-radius:6px;background:#06101c;position:relative;box-shadow:0 4px 0 var(--ink-deep)}
+#scene{display:block;width:100%;aspect-ratio:4/3;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated;touch-action:manipulation;cursor:pointer}
+.tankbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.tankbar .info{font-family:var(--font-label);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.mini{min-height:36px;padding:0 12px;background:var(--panel);border:2px solid var(--line);border-radius:4px;cursor:pointer;font-size:14px;box-shadow:0 2px 0 var(--ink-deep)}
+.mini.on{background:var(--accent);color:var(--accent-ink);border-color:#ffd9a0}
+.mini:active{transform:translateY(1px)}
+
+.meters{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.meter{min-width:0;display:flex;flex-direction:column;gap:5px}
+.meter .row{display:flex;justify-content:space-between;gap:6px;font-family:var(--font-label);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.meter .row b{color:var(--fg);font-family:var(--font-ui);font-size:14px;letter-spacing:0;font-weight:400;font-variant-numeric:tabular-nums}
+.bar{height:12px;background:#0a1624;border:2px solid var(--ink-deep);border-radius:2px;position:relative;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--good);width:0}
+.bar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 3px,rgba(9,20,32,.55) 3px 4px);pointer-events:none}
+.bar.warn i{background:var(--warn)}
+.bar.bad i{background:var(--bad)}
+.bar.hp i{background:var(--water)}
+.tempnote{font-size:13px;color:var(--muted)}
+
+/* buttons */
+.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.btn{min-height:48px;padding:6px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--panel2);border:2px solid var(--line);border-radius:4px;cursor:pointer;box-shadow:0 3px 0 var(--ink-deep);touch-action:manipulation;text-align:center;line-height:1.15}
+.btn:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 var(--ink-deep)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:#ffd9a0;font-weight:600}
+.btn.danger{background:#5a2330;border-color:#a04558}
+.btn:disabled{opacity:.42;cursor:default}
+.btn.wide{grid-column:1/-1}
+.btn.gold{background:#ffd966;color:#3a2600;border-color:#fff0bd;font-weight:600}
+.btn.gold:disabled{background:var(--panel2);color:var(--muted);border-color:var(--line);font-weight:400}
+.btn small{font-family:var(--font-label);font-size:9px;letter-spacing:.08em;opacity:.8}
+.btn.two{flex-direction:column;gap:3px}
+.btn .lbl{display:inline-flex;align-items:center;gap:8px}
+:focus-visible{outline:3px solid var(--water);outline-offset:2px}
+.stepper{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--panel2);border:2px solid var(--line);border-radius:4px;padding:0 4px;min-height:48px;box-shadow:0 3px 0 var(--ink-deep)}
+.stepper .val{text-align:center;line-height:1.1}
+.stepper .val small{display:block;font-family:var(--font-label);font-size:9px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.stepper button{width:40px;height:40px;background:var(--panel);border:2px solid var(--line);border-radius:4px;cursor:pointer;font-size:20px;line-height:1}
+.stepper button:active{transform:translateY(1px)}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-label);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:4px 7px;border-radius:3px;background:#0d1b2c;border:1px solid var(--line);color:var(--fg);white-space:nowrap}
+.chip .sw{width:9px;height:9px;border:1px solid rgba(0,0,0,.5)}
+.chip.dom{border-color:var(--accent);color:var(--accent)}
+.chip.rare{border-style:dashed}
+.chip.lock{color:var(--muted);border-style:dashed;opacity:.8}
+.chip.good{color:var(--good);border-color:var(--good)}
+.chip.warn{color:var(--warn);border-color:var(--warn)}
+.chip.bad{color:var(--bad);border-color:var(--bad)}
+.chip.ok{color:var(--water);border-color:var(--water)}
+
+/* fish cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.fcard{min-width:0;display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:8px;cursor:pointer;box-shadow:0 3px 0 var(--ink-deep)}
+.fcard:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink-deep)}
+.pic{background:linear-gradient(#2f7fae,#15476d);border-radius:3px;display:grid;place-items:center;overflow:hidden;padding:2px 0}
+.pic canvas{image-rendering:pixelated;display:block;width:128px;height:108px;max-width:100%}
+.pic.sil canvas{opacity:.95}
+.fcard .nm{font-weight:600;overflow-wrap:anywhere}
+.fcard .sub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.fcard.lockd{opacity:.9}
+.fcard.picked{border-color:var(--accent)}
+.row2{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+/* breed */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.slot{min-height:150px;align-items:center;justify-content:center;text-align:center}
+.slot .empty{color:var(--muted);font-size:14px;padding:30px 4px}
+.pred{display:flex;flex-direction:column;gap:9px}
+.pred .r{display:grid;grid-template-columns:62px 1fr;gap:8px;align-items:start}
+.pred .r>span{font-family:var(--font-label);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:5px}
+.egg{display:flex;flex-direction:column;gap:6px}
+.egg .bar{height:10px}
+
+/* shop */
+.shop-item{display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center}
+.shop-item .pic{width:128px}
+.shop-item .pic canvas{width:128px;height:108px}
+.shop-item .buy{grid-column:1/-1;flex-direction:row;justify-content:space-between;padding-inline:16px}
+.shop-item .txt{min-width:0;display:flex;flex-direction:column;gap:3px}
+.shop-item .txt b{font-weight:600}
+.shop-item .txt span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.price{display:flex;align-items:center;gap:6px;color:var(--accent);font-variant-numeric:tabular-nums}
+.buy{min-width:84px;flex-direction:column;gap:2px;min-height:52px}
+.plain-item{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.plain-item .txt{min-width:0;display:flex;flex-direction:column;gap:2px}
+.plain-item .txt span{font-size:13px;color:var(--muted)}
+
+/* book */
+.lgrid{display:flex;flex-direction:column;gap:14px}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.stat3 b{display:block;font-size:22px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.stat3 span{font-family:var(--font-label);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* tab bar */
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:4px;background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:4px}
+.seg button{min-height:44px;background:transparent;border:0;border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-label);font-size:10px;letter-spacing:.08em;text-transform:uppercase;touch-action:manipulation}
+.seg button.on{background:var(--panel2);color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:6px;background:var(--panel);border:2px solid var(--line);border-radius:8px}
+.tabs button{position:relative;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:transparent;border:0;border-radius:4px;color:var(--muted);cursor:pointer;font-family:var(--font-label);font-size:9px;letter-spacing:.08em;text-transform:uppercase;touch-action:manipulation}
+.tabs button.on{background:var(--panel2);color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+.tabs .dot{position:absolute;top:6px;right:calc(50% - 20px);width:8px;height:8px;background:var(--bad);border:1px solid var(--ink-deep);display:none}
+.tabs .dot.on{display:block}
+
+/* sheet + toast */
+.sheet{position:fixed;inset:0;z-index:30;background:rgba(3,8,16,.7);display:flex;align-items:flex-end;justify-content:center}
+.sheet .panel{width:100%;max-width:560px;max-height:88%;overflow-y:auto;background:var(--panel);border:2px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.sheet .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.sheet .hd h3{font-size:20px;font-weight:600;overflow-wrap:anywhere}
+.sheet .x{width:40px;height:40px;flex:none;background:var(--panel2);border:2px solid var(--line);border-radius:4px;cursor:pointer;font-size:18px}
+.fish-hero{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}
+.fish-hero .pic{width:160px}
+.fish-hero .pic canvas{width:160px;height:135px}
+.kv{display:flex;flex-direction:column;gap:8px}
+.kv .r{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:start}
+.kv .r>span{font-family:var(--font-label);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:5px}
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(92vw,420px);padding:10px 16px;background:var(--accent);color:var(--accent-ink);border:2px solid #ffd9a0;border-radius:4px;font-weight:600;z-index:40;text-align:center;box-shadow:0 3px 0 var(--ink-deep)}
+ul.tidy{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+@media (max-width:460px){.brand small{display:none}}
+/* juice */
+[hidden]{display:none!important}
+.bar i{transition:width .6s cubic-bezier(.2,.8,.2,1)}
+@keyframes pop{0%{transform:scale(.92)}50%{transform:scale(1.07)}100%{transform:scale(1)}}
+.pop{animation:pop .3s cubic-bezier(.3,1.5,.5,1)}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+.shake{animation:shake .32s}
+@keyframes sheetFade{from{opacity:0}to{opacity:1}}
+@keyframes sheetUp{from{transform:translateY(46px);opacity:.3}to{transform:none;opacity:1}}
+.sheet{animation:sheetFade .18s ease-out}
+.sheet .panel{animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.08)}
+@keyframes toastIn{0%{opacity:0;transform:translateX(-50%) translateY(14px) scale(.88)}60%{opacity:1;transform:translateX(-50%) translateY(-3px) scale(1.04)}100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+.toast{animation:toastIn .34s cubic-bezier(.3,1.2,.5,1)}
+.toast.big{background:#ffe27a;border-color:#fff6c4;box-shadow:0 3px 0 var(--ink-deep),0 0 18px rgba(255,226,122,.55)}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.22)}100%{transform:scale(1)}}
+.coins.bump{animation:bump .22s ease-out}
+@keyframes floatUp{from{opacity:1;transform:translate(-50%,0)}to{opacity:0;transform:translate(-50%,-34px)}}
+.floatnum{position:fixed;z-index:60;pointer-events:none;font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 2px 0 var(--ink-deep);animation:floatUp .95s ease-out forwards}
+.floatnum.up{color:var(--accent)}
+.floatnum.dn{color:#ff8a8a}
+.flycoin{position:fixed;left:0;top:0;z-index:60;pointer-events:none;color:var(--accent);will-change:transform}
+@keyframes tabIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.tab.on{animation:tabIn .22s ease-out}
+@keyframes hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-4px) scale(1.15)}}
+.tabs button.on .ic{animation:hop .32s}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:380px){.fcard .pic canvas{width:96px;height:81px}.shop-item .pic,.shop-item .pic canvas{width:96px}.shop-item .pic canvas{height:81px}.fish-hero .pic,.fish-hero .pic canvas{width:128px}.fish-hero .pic canvas{height:108px}}
+</style>
+<div id="app">
+  <header class="top">
+    <div class="brand">Finlings<small>pocket aquarium</small></div>
+    <div class="coins" title="Coins"><span id="coinIc"></span><span id="coins">0</span></div>
+    <button class="iconbtn" id="btnSound" aria-label="Turn sound off"></button>
+    <button class="iconbtn" id="btnSettings" aria-label="Settings"></button>
+  </header>
+
+  <main id="main">
+    <section class="tab on" id="tab-tank" aria-label="Tank">
+      <div class="tankwrap"><canvas id="scene" width="160" height="120" aria-label="Your aquarium. Tap a fish to see its details."></canvas></div>
+      <div class="tankbar">
+        <span class="info" id="tankInfo"></span>
+        <button class="mini" id="decorBtn">Decorate</button>
+      </div>
+      <p class="hint" id="tankHint"></p>
+      <div class="actions" id="actions"></div>
+      <div class="meters card">
+        <div class="meter"><div class="row"><span>Water</span><b id="mWater"></b></div><div class="bar" id="bWater"><i></i></div></div>
+        <div class="meter"><div class="row"><span>Filter</span><b id="mFilter"></b></div><div class="bar" id="bFilter"><i></i></div></div>
+        <div class="meter"><div class="row"><span>Glass</span><b id="mGlass"></b></div><div class="bar" id="bGlass"><i></i></div></div>
+        <div class="meter"><div class="row"><span>Temp</span><b id="mTemp"></b></div><div class="tempnote" id="tTemp"></div></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-fish" aria-label="Crew"></section>
+    <section class="tab" id="tab-breed" aria-label="Breeding"></section>
+    <section class="tab" id="tab-shop" aria-label="Shop"></section>
+    <section class="tab" id="tab-book" aria-label="Collection book"></section>
+  </main>
+
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+</div>
+
+<div class="sheet" id="sheet" hidden><div class="panel" id="sheetPanel" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden></div>
+<script>
+'use strict';
+/* ================= helpers ================= */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const ri=(a,b)=>Math.floor(rnd(a,b+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+function fmtDur(m){
+  m=Math.max(0,Math.round(m));
+  if(m<1) return '<1m';
+  const h=Math.floor(m/60), mm=m%60;
+  if(h>=24){const d=Math.floor(h/24);return d+'d '+(h%24)+'h';}
+  return h?(h+'h'+(mm?' '+mm+'m':'')):(mm+'m');
+}
+function hexRgb(h){const n=parseInt(h.slice(1),16);return [n>>16&255,n>>8&255,n&255];}
+function rgbHex(r){return '#'+r.map(v=>Math.round(clamp(v,0,255)).toString(16).padStart(2,'0')).join('');}
+function mixHex(a,b,t){const A=hexRgb(a),B=hexRgb(b);return rgbHex(A.map((v,i)=>v+(B[i]-v)*t));}
+const lighten=(h,t)=>mixHex(h,'#ffffff',t);
+const darken=(h,t)=>mixHex(h,'#0b1030',t);
+function hash2(x,y){let h=(Math.imul(x,374761393)+Math.imul(y,668265263))|0;h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0);}
+
+/* ================= pixel icons ================= */
+const ICONS={
+  fish:["..####.....",".#######.#.","##.#####..##",".#######.#.","..####....."],
+  tank:["#########","#.......#","#.#...#.#","#.##.##.#","#.......#","#########"],
+  heart:[".##.##.","#######","#######",".#####.","..###..","...#..."],
+  bag:["...##...","..#..#..",".######.","########","########","########",".######."],
+  book:[".######.","#.#....#","#.#.##.#","#.#....#","#.#.##.#","#.######",".#######"],
+  coin:["..###..",".#...#.","#..#..#","#..#..#",".#...#.","..###.."],
+  food:["..#...#.","........",".#...#..","...#....","#...#..#","..#....."],
+  drop:["...#...","...#...","..###..",".#####.","#######","#######",".#####.","..###.."],
+  scrub:["....###","...####","..####.",".####..","####...","###...."],
+  filter:[".#####.","#..#..#","#.###.#","#..#..#",".#####."],
+  pill:["..###..","..###..","#######","#######","#######","..###..","..###.."],
+  gear:["..#.#..",".#####.","##...##",".#...#.","##...##",".#####.","..#.#.."],
+  plus:["..#..","..#..","#####","..#..","..#.."],
+  sound:["....#.....","...##..#..","####.#..#.","####.#..#.","####.#..#.","...##..#..","....#....."],
+  mute:["....#.....","...##.#..#","####..#.#.","####...#..","####..#.#.","...##.#..#","....#....."],
+  egg:["..###..",".#####.","#######","#######","#######",".#####.","..###.."]
+};
+function ic(n,s=2){
+  const rows=ICONS[n]; const w=Math.max(...rows.map(r=>r.length)); let rects='';
+  rows.forEach((r,y)=>{for(let x=0;x<r.length;x++) if(r[x]==='#') rects+=`<rect x="${x}" y="${y}" width="1" height="1"/>`;});
+  return `<svg class="ic" viewBox="0 0 ${w} ${rows.length}" width="${w*s}" height="${rows.length*s}" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+}
+
+/* ================= genetics data ================= */
+const COLORS=[
+  {n:'Coral',c:'#ff7a45',d:6},{n:'Ruby',c:'#e0304f',d:5},{n:'Sun',c:'#ffd23f',d:7},{n:'Lime',c:'#8bd346',d:4},
+  {n:'Teal',c:'#27b5a5',d:8},{n:'Azure',c:'#3b8fe8',d:9},{n:'Violet',c:'#8a63d2',d:3},{n:'Bubblegum',c:'#ff8fc0',d:2},
+  {n:'Silver',c:'#cdd6e2',d:1.5,r:1},{n:'Midnight',c:'#2f3a8c',d:1.3,r:1},{n:'Gold',c:'#d9a21b',d:1.2,r:1},{n:'Ghost',c:'#f2f2ea',d:1,r:1}
+];
+const LOCI={
+  color:{label:'Body',opts:COLORS,common:8},
+  accent:{label:'Accent',opts:COLORS,common:8},
+  pattern:{label:'Pattern',opts:[{n:'Plain',d:8},{n:'Stripe',d:7},{n:'Spots',d:6},{n:'Bands',d:5},{n:'Belly',d:4},{n:'Mask',d:3},{n:'Speckle',d:2},{n:'Tiger',d:1,r:1}],common:7},
+  tail:{label:'Tail',opts:[{n:'Fork',d:5},{n:'Round',d:4},{n:'Fan',d:3},{n:'Veil',d:2},{n:'Ribbon',d:1,r:1}],common:4},
+  fin:{label:'Fin',opts:[{n:'Flat',d:4},{n:'Short',d:3},{n:'Tall',d:2},{n:'Crown',d:1,r:1}],common:3},
+  size:{label:'Size',opts:[{n:'Small'},{n:'Medium'},{n:'Large'}],common:3},
+  sheen:{label:'Sheen',opts:[{n:'None',d:3},{n:'Glow',d:1,r:1},{n:'Pearl',d:2,r:1}],common:1}
+};
+const LOCUS_KEYS=Object.keys(LOCI);
+const SIZE_NAMES=['Tiny','Small','Medium','Large','Huge'];
+
+function expr(key,pair){
+  const a=pair[0],b=pair[1];
+  if(a===b) return a;
+  const o=LOCI[key].opts;
+  return (o[a].d||0)>=(o[b].d||0)?a:b;
+}
+function phenotype(f){
+  const g=f.g;
+  return {
+    color:expr('color',g.color),accent:expr('accent',g.accent),pattern:expr('pattern',g.pattern),
+    tail:expr('tail',g.tail),fin:expr('fin',g.fin),
+    size:(g.size[0]+g.size[1])/2,
+    sheen:(g.sheen[0]===g.sheen[1]&&g.sheen[0]>0)?g.sheen[0]:0
+  };
+}
+function traitText(ph,kind){
+  kind=kind||'fish';
+  const p=LD(kind,'pattern').opts[ph.pattern].n;
+  const bits=[COLORS[ph.color].n+(ph.pattern?' '+p:'')];
+  if(kind!=='shrimp') bits.push(LD(kind,'tail').opts[ph.tail].n+(kind==='jelly'?'':' tail'));
+  if(ph.fin) bits.push(LD(kind,'fin').opts[ph.fin].n+(kind==='jelly'?' frills':' fin'));
+  if(ph.sheen) bits.push(LD(kind,'sheen').opts[ph.sheen].n);
+  return bits.join(' · ');
+}
+function morphKey(f){const ph=phenotype(f);return [f.sp,ph.color,ph.accent,ph.pattern,ph.tail,ph.fin,ph.sheen].join('.')+(f.hyb?'+'+f.hyb:'');}
+function rarity(ph){
+  let r=0;
+  if(COLORS[ph.color].r) r+=1.6;
+  if(COLORS[ph.accent].r) r+=0.7;
+  r+=[0,0.1,0.15,0.2,0.2,0.25,0.3,1.2][ph.pattern];
+  r+=[0,0.1,0.25,0.5,1.3][ph.tail];
+  r+=[0,0.1,0.3,1.2][ph.fin];
+  r+=[0,2.5,3][ph.sheen];
+  if(ph.size===2) r+=0.5; else if(ph.size===0) r+=0.3;
+  return r;
+}
+
+/* ================= species ================= */
+const SPECIES=[
+  {id:'tetra',kind:'fish',n:'Pebble Tetra',shape:'slim',len:12,hei:5,price:25,lo:23,hi:27,spd:1.2,dep:.45,hun:1,w:1,tailMul:1,finMul:1,blurb:'Tiny, tireless schooler.'},
+  {id:'guppy',kind:'fish',n:'Dapple Guppy',shape:'oval',len:11,hei:6,price:30,lo:22,hi:27,spd:1,dep:.3,hun:1,w:1,tailMul:1.45,finMul:1,blurb:'Flashy tail, flashier attitude.'},
+  {id:'danio',kind:'fish',n:'Comet Danio',shape:'slim',len:15,hei:5,price:40,lo:18,hi:25,spd:1.5,dep:.25,hun:1,w:1,tailMul:1.2,finMul:1,blurb:'Zooms around like it is late.'},
+  {id:'goldie',kind:'fish',n:'Bubble Goldie',shape:'round',len:14,hei:10,price:55,lo:18,hi:24,spd:.7,dep:.5,hun:1.25,w:1,tailMul:1.1,finMul:1,blurb:'Always asks for seconds.'},
+  {id:'loach',kind:'fish',n:'Whisker Loach',shape:'long',len:20,hei:4,price:70,lo:22,hi:27,spd:.9,dep:.86,hun:1,w:1,tailMul:.8,finMul:.8,blurb:'The noodle of the tank floor.'},
+  {id:'betta',kind:'fish',n:'Fan Betta',shape:'oval',len:15,hei:8,price:80,lo:24,hi:28,spd:.6,dep:.35,hun:.9,w:1,tailMul:1.5,finMul:1.5,blurb:'Dramatic. Fins for days.'},
+  {id:'angel',kind:'fish',n:'Moon Angel',shape:'tall',len:14,hei:15,price:110,lo:24,hi:28,spd:.5,dep:.5,hun:1,w:1,tailMul:1,finMul:1.6,blurb:'Glides like it owns the place.'},
+  {id:'pleco',kind:'fish',n:'Sucker Pleco',shape:'bottom',len:17,hei:8,price:120,lo:23,hi:28,spd:.35,dep:.92,hun:.8,w:1,tailMul:.9,finMul:1.2,algae:1.2,blurb:'Scrapes algae off the glass.'},
+  {id:'puffer',kind:'fish',n:'Puff Pufferling',shape:'round',len:12,hei:11,price:150,lo:24,hi:28,spd:.6,dep:.55,hun:1.1,w:1,tailMul:.8,finMul:.7,blurb:'Round and very proud of it.'},
+  {id:'discus',kind:'fish',n:'Halo Discus',shape:'disc',len:17,hei:17,price:220,lo:26,hi:30,spd:.4,dep:.5,hun:1.1,w:1,tailMul:.8,finMul:1,blurb:'Serene, with expensive taste.'},
+  {id:'cherry',kind:'shrimp',n:'Cherry Shrimp',shape:'shrimp',len:10,hei:5,price:35,lo:18,hi:28,spd:.5,dep:1,hun:.7,w:.5,algae:.5,blurb:'Tiny, bright, and always snacking.'},
+  {id:'ghost',kind:'shrimp',n:'Ghost Shrimp',shape:'shrimp',len:12,hei:5,price:45,lo:18,hi:28,spd:.55,dep:1,hun:.7,w:.5,algae:.6,ghost:1,blurb:'See-through, so you can watch it eat.'},
+  {id:'amano',kind:'shrimp',n:'Amano Shrimp',shape:'shrimp',len:15,hei:6,price:75,lo:20,hi:27,spd:.5,dep:1,hun:.8,w:.6,algae:1.1,blurb:'The hardest-working algae cleaner.'},
+  {id:'moon',kind:'jelly',jshape:'saucer',n:'Moon Jelly',len:15,hei:7,price:160,lo:18,hi:25,cold:20,spd:.35,dep:.4,hun:.6,w:1,sens:1,pulse:.8,quirk:'Four glowing rings',blurb:'A flat saucer with four glowing rings.'},
+  {id:'nettle',kind:'jelly',jshape:'nettle',n:'Sea Nettle',len:12,hei:10,price:240,lo:20,hi:26,cold:21,spd:.4,dep:.35,hun:.7,w:1,sens:1,pulse:1,quirk:'Long trailing streamers',blurb:'Ruffled arms and long streamers behind it.'},
+  {id:'mat',kind:'jelly',jshape:'rosette',n:'Upside-down Jelly',len:16,hei:6,price:200,lo:25,hi:30,cold:24,spd:.15,dep:1,hun:.3,w:1,sens:1,floor:1,algae:.4,pulse:.6,quirk:'Sunbathes on the sand, eats little, nibbles algae',blurb:'Naps upside down on the sand like a flower.'},
+  {id:'comb',kind:'jelly',jshape:'comb',n:'Comb Jelly',len:9,hei:12,price:180,lo:16,hi:26,spd:.45,dep:.5,hun:.6,w:1,sens:1,direct:1,glide:1,pulse:1.5,quirk:'Rainbow comb rows. No polyps, lays eggs instead',blurb:'Not a true jelly. Its rows flash every color.'},
+  {id:'immortal',kind:'jelly',jshape:'tiny',n:'Immortal Jelly',len:7,hei:7,price:320,lo:20,hi:28,cold:22,spd:.3,dep:.3,hun:.5,w:.6,sens:1,immortal:1,pulse:1.3,quirk:'Turns back into a polyp instead of getting sick',blurb:'Tiny, with a bright red middle. Starts over, never gives up.'},
+  {id:'box',kind:'jelly',jshape:'box',n:'Box Jelly',len:9,hei:10,price:280,lo:24,hi:29,cold:23,spd:.7,dep:.45,hun:.7,w:1,sens:1,pulse:2,quirk:'Fast. Other swimmers keep away',blurb:'A cube with eyes. Speedy and a bit scary.'}
+];
+const SP=Object.fromEntries(SPECIES.map(s=>[s.id,s]));
+/* ================= creature kinds ================= */
+const KIND_NAMES={fish:'Fish',shrimp:'Shrimp',jelly:'Jellyfish'};
+const STAGE_NAMES={fish:['Fry','Juvenile','Adult'],shrimp:['Shrimplet','Juvenile','Adult'],jelly:['Ephyra','Juvenile','Adult']};
+const KIND_LOCI={fish:['color','accent','pattern','tail','fin','size','sheen'],shrimp:['color','accent','pattern','size','sheen'],jelly:['color','accent','pattern','tail','fin','size','sheen']};
+const LABEL_OVERRIDE={
+  shrimp:{accent:'Markings',names:{pattern:['Plain','Stripe','Spots','Saddle','Belly','Cap','Speckle','Tiger']}},
+  jelly:{color:'Bell',accent:'Tendrils',pattern:'Bell mark',tail:'Tentacles',fin:'Frills',names:{pattern:['Plain','Ribs','Spots','Rings','Core','Cap','Speckle','Swirl'],tail:['Short','Long','Frilly','Curly','Ribbon'],fin:['None','Soft','Lacy','Crown'],sheen:['None','Glow','Shimmer']}}
+};
+function LD(kind,key){
+  const base=LOCI[key],ov=LABEL_OVERRIDE[kind],names=ov&&ov.names&&ov.names[key];
+  return {label:(ov&&ov[key])||base.label,opts:names?base.opts.map((o,i)=>Object.assign({},o,{n:names[i]})):base.opts};
+}
+const kindOf=f=>SP[f.sp].kind||'fish';
+const lociOf=kind=>KIND_LOCI[kind]||KIND_LOCI.fish;
+const TRAITS=[
+  {id:'shy',n:'Shy',d:'Hides near plants and the sand.'},
+  {id:'bold',n:'Bold',d:'Explores the whole tank.'},
+  {id:'greedy',n:'Greedy',d:'First to every meal.'},
+  {id:'lazy',n:'Lazy',d:'Takes long naps.'},
+  {id:'social',n:'Social',d:'Sticks close to its friends.'},
+  {id:'playful',n:'Playful',d:'Chases tank mates and zigzags.'}
+];
+const TRAIT=Object.fromEntries(TRAITS.map(t=>[t.id,t]));
+
+/* ================= species helpers ================= */
+const shortName=id=>{const n=SP[id].n.split(' ');return SP[id].kind==='fish'?n[n.length-1]:n[0];};
+const hybLabel=o=>shortName(o.sp)+' × '+shortName(o.hyb);
+const speciesLabel=o=>o.hyb?hybLabel(o)+' hybrid':SP[o.sp].n;
+const rangeOf=o=>{const a=SP[o.sp],b=o.hyb&&SP[o.hyb];return b?{lo:Math.min(a.lo,b.lo),hi:Math.max(a.hi,b.hi)}:{lo:a.lo,hi:a.hi};};
+const baseValue=o=>o.hyb?Math.round((SP[o.sp].price+SP[o.hyb].price)/2*1.5):SP[o.sp].price;
+const viaPolyp=id=>SP[id].kind==='jelly'&&!SP[id].direct;
+const coldOf=o=>{const cs=[SP[o.sp].cold,o.hyb&&SP[o.hyb].cold].filter(v=>typeof v==='number');return cs.length?Math.round(cs.reduce((a,b)=>a+b,0)/cs.length):22;};
+const hybKey=(a,b)=>[a,b].sort().join(':');
+
+const NAMES=['Bubbles','Pip','Mochi','Nori','Kelp','Sushi','Dot','Finn','Ziggy','Pebble','Tango','Miso','Waffles','Sunny','Juno','Olive','Biscuit','Comet','Nibbles','Pixel','Coral','Wiggles','Saffron','Puddle','Tofu','Zephyr','Mango','Ripple','Gizmo','Ember','Clover','Shrimp','Orbit','Bean','Sprout','Fizz','Marlo','Dory','Pearl','Gill','Skipper','Tiny','Captain','Luna','Kiwi','Muffin','Squid','Rowan'];
+
+/* ================= shop data ================= */
+const STAGES=['Fry','Juvenile','Adult'];
+const STAGE_AGE=[45,180];
+const EGG_MIN=30, COOLDOWN_MIN=120, MUT=0.02, OFFLINE_CAP_MIN=72*60, NURSERY_MAX=2;
+const TANKS=[
+  {n:'Nano tank',l:'20 L',cap:4,price:0,dil:1},
+  {n:'Standard tank',l:'60 L',cap:7,price:180,dil:.9},
+  {n:'Large tank',l:'120 L',cap:10,price:450,dil:.8},
+  {n:'Show tank',l:'240 L',cap:14,price:1100,dil:.7}
+];
+const FILTERS=[
+  {n:'Sponge filter',eff:1,life:30,price:0},
+  {n:'Hang-on filter',eff:1.15,life:48,price:150},
+  {n:'Canister filter',eff:1.3,life:72,price:400}
+];
+const THEMES=[
+  {id:'open',n:'Open water',price:0,top:'#3a8fbf',bot:'#14466b',sand:'#dcb97e',sand2:'#b98f55',sil:'#1f5f8a',kind:'rocks'},
+  {id:'kelp',n:'Kelp forest',price:60,top:'#2f9a8c',bot:'#0f4a4f',sand:'#c8b07a',sand2:'#9c8350',sil:'#1d6b58',kind:'kelp'},
+  {id:'sunset',n:'Sunset reef',price:90,top:'#d9826b',bot:'#463a7e',sand:'#e2c08a',sand2:'#b98f6a',sil:'#5a3f7e',kind:'reef'},
+  {id:'deep',n:'Deep blue',price:90,top:'#2256a5',bot:'#0a1f4a',sand:'#8d9bb0',sand2:'#687690',sil:'#14337a',kind:'rocks'},
+  {id:'mint',n:'Mint lagoon',price:120,top:'#6fd1b7',bot:'#1d7b82',sand:'#f0dcae',sand2:'#cbb27a',sil:'#2d9a90',kind:'reef'}
+];
+const DECOR_DEF=[
+  {id:'kelp',n:'Kelp strands',price:20,plant:1},
+  {id:'fern',n:'Green fern',price:25,plant:1},
+  {id:'redweed',n:'Red weed',price:30,plant:1},
+  {id:'pebbles',n:'Pebble pile',price:8},
+  {id:'shell',n:'Big shell',price:15},
+  {id:'rock',n:'Mossy rock',price:30},
+  {id:'wood',n:'Driftwood',price:45},
+  {id:'chest',n:'Treasure chest',price:90},
+  {id:'bubbler',n:'Air stone',price:70},
+  {id:'castle',n:'Sandcastle',price:120},
+  {id:'arch',n:'Ruin arch',price:150}
+];
+const DECOR=Object.fromEntries(DECOR_DEF.map(d=>[d.id,d]));
+const SLOT_X=[18,49,80,111,142];
+/* ================= state ================= */
+let S=null;
+const SAVE_KEY='finlings.save.v1';
+const EGG_BY_KIND={fish:30,shrimp:40,jelly:45};
+const POLYP_CHILL_MIN=180;
+/* celebration events: the sim queues them, the scene draws bursts, the UI shows toasts */
+const JUICE_Q=[];let JUICE_ON=false;
+function qJuice(e){
+  if(!JUICE_ON) return;
+  if(JUICE_Q.length>24) JUICE_Q.shift();
+  e.t0=performance.now();JUICE_Q.push(e);
+}
+
+function defaultState(){
+  return {v:2,coins:60,pile:0,coinFrac:0,nextId:1,fish:[],eggs:[],polyps:[],waste:10,filter:100,algae:5,temp:25,heater:25,
+    tankLvl:0,filterLvl:0,feeder:{owned:false,stock:0},meds:0,themes:{open:1},sound:true,
+    decor:{owned:{},slots:[null,null,null,null,null]},theme:'open',
+    book:{sp:{},al:{},morph:{},hyb:{}},lastSeen:Date.now(),savedAt:0,created:Date.now(),seenWelcome:false,news:0,
+    stats:{hatched:0,bred:0,earned:0,sold:0,released:0,hybrids:0}};
+}
+function founderGenes(kind){
+  const g={};
+  const used=lociOf(kind||'fish');
+  for(const k of LOCUS_KEYS){
+    const n=LOCI[k].common;
+    if(!used.includes(k)||k==='sheen') g[k]=[0,0];
+    else g[k]=[ri(0,n-1),ri(0,n-1)];
+  }
+  return g;
+}
+function makeFish(sp,g,age,hyb){
+  const f={id:S.nextId++,name:pick(NAMES),sp,g,age,trait:pick(TRAITS).id,
+    hunger:age>=STAGE_AGE[1]?85:95,health:100,sick:false,cool:0};
+  if(hyb) f.hyb=hyb;
+  return f;
+}
+function discoverAlleles(sp,g,id){
+  const isNew=!S.book.sp[sp];
+  S.book.sp[sp]=1;
+  const kind=SP[sp].kind||'fish',found=[];
+  for(const k of lociOf(kind)){
+    const key=kind+'.'+k;
+    const a=S.book.al[key]||(S.book.al[key]={});
+    g[k].forEach(i=>{
+      if(a[i]) return;
+      a[i]=1;
+      const L=LD(kind,k),o=L.opts[i];
+      if(o.n!=='None') found.push({rare:!!o.r,txt:o.n+' '+L.label.toLowerCase()});
+    });
+  }
+  if(isNew) qJuice({kind:'species',id,msg:'New species: '+SP[sp].n+'!'});
+  if(found.length){
+    found.sort((x,y)=>y.rare-x.rare);
+    const top=found[0];
+    qJuice({kind:top.rare?'rare':'gene',id,msg:(top.rare?'Rare gene found: ':'New gene: ')+top.txt+(found.length>1?' (+'+(found.length-1)+' more)':'')+(top.rare?'!':'')});
+  }
+}
+function noteHybrid(sp,hyb){if(hyb){S.book.hyb[hybKey(sp,hyb)]=1;S.stats.hybrids++;}}
+function discover(f){
+  discoverAlleles(f.sp,f.g,f.id);
+  if(f.hyb){
+    const k=hybKey(f.sp,f.hyb);
+    if(!S.book.hyb[k]){S.book.hyb[k]=1;qJuice({kind:'hyb',id:f.id,msg:'New hybrid: '+hybLabel(f)+'!'});}
+  }
+  S.book.morph[morphKey(f)]=1;
+}
+function addFish(f){S.fish.push(f);discover(f);return f;}
+function newGame(){
+  S=defaultState();
+  addFish(makeFish('tetra',founderGenes('fish'),STAGE_AGE[1]+30));
+  addFish(makeFish('tetra',founderGenes('fish'),STAGE_AGE[1]+30));
+}
+function normalize(o){
+  const d=defaultState();
+  const s=Object.assign(d,o);
+  s.v=2;
+  s.feeder=Object.assign(d.feeder,o.feeder||{});
+  s.decor={owned:Object.assign({},(o.decor&&o.decor.owned)||{}),slots:((o.decor&&o.decor.slots)||d.decor.slots).slice(0,5)};
+  while(s.decor.slots.length<5) s.decor.slots.push(null);
+  const al={};
+  const oldAl=(o.book&&o.book.al)||{};
+  for(const k of Object.keys(oldAl)) al[k.indexOf('.')<0?'fish.'+k:k]=oldAl[k];
+  const fixId=id=>id==='lantern'?'nettle':id;
+  const bsp={};for(const k of Object.keys((o.book&&o.book.sp)||{})) bsp[fixId(k)]=1;
+  const bm={};for(const k of Object.keys((o.book&&o.book.morph)||{})) bm[k.replace(/^lantern\./,'nettle.').replace(/\+lantern$/,'+nettle')]=1;
+  s.book={sp:bsp,al,morph:bm,hyb:Object.assign({},(o.book&&o.book.hyb)||{})};
+  s.stats=Object.assign(d.stats,o.stats||{});
+  s.themes=Object.assign({open:1},o.themes||{});
+  for(const f of (o.fish||[]).concat(o.polyps||[])){if(f){f.sp=fixId(f.sp);if(f.hyb) f.hyb=fixId(f.hyb);}}
+  s.fish=(o.fish||[]).filter(f=>f&&SP[f.sp]&&f.g&&(!f.hyb||SP[f.hyb]));
+  for(const f of s.fish){if(!f.trait||!TRAIT[f.trait]) f.trait=pick(TRAITS).id;}
+  s.polyps=(o.polyps||[]).filter(p=>p&&SP[p.sp]&&p.g&&(!p.hyb||SP[p.hyb]));
+  s.eggs=(o.eggs||[]).map(e=>{
+    e.sp=fixId(e.sp);
+    e.kids=(e.kids||[]).map(k=>{if(k&&k.g&&k.sp){k.sp=fixId(k.sp);if(k.hyb) k.hyb=fixId(k.hyb);return k;}return {g:k,sp:e.sp};});
+    return e;
+  }).filter(e=>SP[e.sp]);
+  s.pile=+s.pile||0;
+  if(s.pile===0&&s.coinFrac){s.pile=s.coinFrac;s.coinFrac=0;}
+  return s;
+}
+function serialize(){S.savedAt=Date.now();S.lastSeen=Date.now();return JSON.stringify(S);}
+
+/* ================= derived values ================= */
+const stageOf=f=>f.age<STAGE_AGE[0]?0:(f.age<STAGE_AGE[1]?1:2);
+const stageName=f=>STAGE_NAMES[kindOf(f)][stageOf(f)];
+const capacity=()=>TANKS[S.tankLvl].cap;
+const weightOf=f=>SP[f.sp].w||1;
+const usedSpace=()=>S.fish.reduce((a,f)=>a+weightOf(f),0);
+const hasRoom=spId=>usedSpace()+(SP[spId].w||1)<=capacity()+0.001;
+const fmtSpace=n=>(Math.round(n*10)/10).toString();
+const polypCap=()=>2+S.tankLvl;
+function fishValue(f){return Math.round(baseValue(f)*(1+0.6*rarity(phenotype(f))));}
+function sellPrice(f){return Math.max(1,Math.round(fishValue(f)*[0.3,0.45,0.6][stageOf(f)]));}
+function incomePerHour(f){
+  if(f.sick||stageOf(f)<1||f.hunger<=25) return 0;
+  return fishValue(f)*0.1*(stageOf(f)===2?1:0.5);
+}
+function tempOff(f){const sp=rangeOf(f);return S.temp<sp.lo?sp.lo-S.temp:(S.temp>sp.hi?S.temp-sp.hi:0);}
+const wasteLimit=f=>SP[f.sp].sens?40:55;
+function mood(f){
+  if(f.sick) return ['Sick','bad'];
+  if(f.hunger<25) return ['Starving','bad'];
+  if(f.hunger<45) return ['Hungry','warn'];
+  if(S.waste>wasteLimit(f)+5) return ['Stressed','warn'];
+  if(tempOff(f)>0.5) return ['Chilly or hot','warn'];
+  if(f.health>75&&f.hunger>60&&S.waste<wasteLimit(f)-15) return ['Happy','good'];
+  return ['Content','ok'];
+}
+const plantCount=()=>S.decor.slots.filter(id=>id&&DECOR[id].plant).length;
+const sickCount=()=>S.fish.filter(f=>f.sick).length;
+const isBerried=f=>S.eggs.some(e=>e.carrier===f.id);
+function cloneGenes(g){const o={};for(const k of LOCUS_KEYS) o[k]=g[k].slice();return o;}
+
+/* ================= simulation ================= */
+function newFry(sp,g,hyb){
+  const f=makeFish(sp,g,0,hyb);
+  f.hunger=80;
+  return f;
+}
+function newPolyp(sp,g,hyb){
+  const p={id:S.nextId++,sp,g,size:1,chill:0,born:Date.now()};
+  if(hyb) p.hyb=hyb;
+  return p;
+}
+function step(dt,ev){
+  const T=TANKS[S.tankLvl],F=FILTERS[S.filterLvl];
+  S.temp+=clamp(S.heater-S.temp,-dt*0.1,dt*0.1);
+  S.filter=Math.max(0,S.filter-dt*100/(F.life*60));
+  let load=0,eaters=0;
+  for(const f of S.fish){
+    const st=stageOf(f);
+    load+=[0.35,0.7,1][st]*(SP[f.sp].w||1);
+    if(SP[f.sp].algae&&st>=1) eaters+=SP[f.sp].algae;
+  }
+  const fm=Math.max(0.1,1.25-S.filter/100*F.eff);
+  const wm=T.dil*(1-0.03*plantCount());
+  S.waste=clamp(S.waste+load*0.02*fm*wm*dt,0,100);
+  S.algae=clamp(S.algae+(0.012+S.waste*0.0005)*dt-eaters*0.03*dt,0,100);
+
+  const rev=[];
+  for(const f of S.fish){
+    const before=stageOf(f);
+    f.age+=dt;
+    const st=stageOf(f),sp=SP[f.sp];
+    if(st>before){ev.grown=(ev.grown||0)+1;if(typeof onStageUp==='function') onStageUp(f,st);}
+    const tm=f.trait==='greedy'?1.1:(f.trait==='lazy'?0.92:1);
+    f.hunger=Math.max(0,f.hunger-100/600*sp.hun*tm*[1.3,1.1,1][st]*dt);
+    if(S.feeder.owned&&S.feeder.stock>0&&f.hunger<35){
+      f.hunger=Math.min(100,f.hunger+60);S.feeder.stock--;S.waste=Math.min(100,S.waste+0.6);ev.fed++;
+    }
+    let dmg=0;
+    if(f.hunger<25) dmg+=(25-f.hunger)/25*0.16;
+    const wl=wasteLimit(f);
+    if(S.waste>wl) dmg+=(S.waste-wl)/(100-wl)*0.18;
+    if(S.algae>85) dmg+=0.03;
+    const off=tempOff(f);
+    if(off>0.5) dmg+=Math.min(off,6)*0.05;
+    if(dmg>0) f.health-=dmg*dt;
+    else if(f.hunger>40&&S.waste<wl-10) f.health+=0.1*dt;
+    f.health=clamp(f.health,5,100);
+    if(!f.sick&&f.health<35){
+      if(sp.immortal&&st>=1&&S.polyps.length+rev.length<polypCap()) rev.push(f);
+      else{f.sick=true;ev.sick++;}
+    }else if(f.sick&&f.health>=60) f.sick=false;
+    f.cool=Math.max(0,f.cool-dt);
+    S.pile+=incomePerHour(f)/60*dt;
+  }
+
+  for(const f of rev){
+    S.fish=S.fish.filter(x=>x!==f);
+    const p=newPolyp(f.sp,cloneGenes(f.g),f.hyb);p.size=2;p.was=f.name;
+    S.polyps.push(p);ev.reverted.push(f.name);
+  }
+
+  /* eggs and larvae */
+  for(const egg of S.eggs){
+    egg.t=Math.max(0,egg.t-dt);
+    if(egg.t>0) continue;
+    const keep=[];
+    for(const kid of egg.kids){
+      if(viaPolyp(kid.sp)){
+        if(S.polyps.length<polypCap()){
+          S.polyps.push(newPolyp(kid.sp,kid.g,kid.hyb));discoverAlleles(kid.sp,kid.g);noteHybrid(kid.sp,kid.hyb);ev.settled=(ev.settled||0)+1;
+        }else keep.push(kid);
+      }else if(hasRoom(kid.sp)){
+        const nf=addFish(newFry(kid.sp,kid.g,kid.hyb));qJuice({kind:'hatch',id:nf.id});noteHybrid(kid.sp,kid.hyb);S.stats.hatched++;ev.hatched++;
+      }else keep.push(kid);
+    }
+    egg.kids=keep;
+  }
+  S.eggs=S.eggs.filter(e=>e.kids.length>0);
+
+  /* jellyfish polyps: slow growth, cold wakes them up */
+  for(const p of S.polyps){
+    const cold=coldOf(p);
+    if(S.waste<60) p.size=Math.min(8,p.size+dt/150);
+    if(S.temp<=cold+0.2) p.chill+=dt; else p.chill=Math.max(0,p.chill-dt*0.5);
+    if(p.chill>=POLYP_CHILL_MIN&&p.size>=2){
+      const want=clamp(Math.floor(p.size/2),1,4);
+      let made=0;
+      while(made<want&&hasRoom(p.sp)){
+        const nf=addFish(newFry(p.sp,cloneGenes(p.g),p.hyb));
+        if(p.was){nf.name=p.was;delete p.was;}
+        qJuice({kind:'hatch',id:nf.id});
+        made++;
+      }
+      if(made){
+        p.size=Math.max(1,p.size-made*1.5);p.chill=0;
+        ev.released=(ev.released||0)+made;S.stats.released++;
+      }
+    }
+  }
+}
+function simulate(mins){
+  const ev={coins:0,hatched:0,sick:0,fed:0,grown:0,settled:0,released:0,reverted:[]};
+  const pile0=S.pile;
+  let left=mins;
+  while(left>0.0001){const dt=Math.min(10,left);left-=dt;step(dt,ev);}
+  ev.coins=Math.max(0,S.pile-pile0);
+  return ev;
+}
+
+/* ================= breeding ================= */
+function inherit(key,pair){
+  let a=pair[Math.random()<0.5?0:1];
+  if(Math.random()<MUT) a=mutateAllele(key,a);
+  return a;
+}
+function mutateAllele(key,cur){
+  const o=LOCI[key].opts,rare=[],common=[];
+  for(let i=0;i<o.length;i++){if(i===cur) continue;(o[i].r?rare:common).push(i);}
+  const pool=(rare.length&&Math.random()<0.55)?rare:(common.length?common:rare);
+  return pick(pool);
+}
+function crossGenes(a,b){
+  const g={};
+  const used=lociOf(kindOf(a));
+  for(const k of LOCUS_KEYS) g[k]=used.includes(k)?[inherit(k,a.g[k]),inherit(k,b.g[k])]:[0,0];
+  return g;
+}
+function breedBlock(f){
+  if(f.hyb) return 'Hybrids are sterile';
+  if(stageOf(f)<2) return 'Still growing';
+  if(f.sick) return 'Sick';
+  if(f.hunger<30) return 'Too hungry';
+  if(f.cool>0) return 'Resting '+fmtDur(f.cool);
+  return '';
+}
+function pairBlock(a,b){
+  if(!a||!b) return 'Choose two';
+  if(kindOf(a)!==kindOf(b)) return 'Same kind only';
+  if(S.eggs.length>=NURSERY_MAX) return 'The nursery is full';
+  return breedBlock(a)||breedBlock(b)||'';
+}
+function doBreed(a,b){
+  const kind=kindOf(a),mixed=a.sp!==b.sp;
+  const bothDirect=!!SP[a.sp].direct&&!!SP[b.sp].direct;
+  const n=kind==='jelly'?(bothDirect?ri(2,3):ri(1,2)):(kind==='shrimp'?ri(3,6):ri(2,4));
+  const kids=[];
+  for(let i=0;i<n;i++){
+    const kid={g:crossGenes(a,b),sp:a.sp};
+    if(mixed){kid.sp=Math.random()<0.5?a.sp:b.sp;kid.hyb=kid.sp===a.sp?b.sp:a.sp;}
+    kids.push(kid);
+  }
+  const total=bothDirect?35:EGG_BY_KIND[kind];
+  const egg={id:S.nextId++,sp:a.sp,t:total,total,kids,parents:[a.name,b.name]};
+  if(kind==='shrimp') egg.carrier=(Math.random()<0.5?a:b).id;
+  S.eggs.push(egg);
+  a.cool=b.cool=COOLDOWN_MIN;
+  S.stats.bred++;
+  return {n,kind,total,mixed,direct:bothDirect,poly:kids.some(k=>viaPolyp(k.sp))};
+}
+/* chance table for one locus given two parents (ignores mutation) */
+function predictLocus(key,a,b){
+  const kind=kindOf(a),L=LD(kind,key);
+  const map=new Map();
+  for(const x of a.g[key]) for(const y of b.g[key]){
+    let label,sw=null,rare=false;
+    if(key==='size'){label=SIZE_NAMES[(x+y)];}
+    else if(key==='sheen'){const v=(x===y&&x>0)?x:0;label=L.opts[v].n;rare=v>0;}
+    else{const v=expr(key,[x,y]);label=L.opts[v].n;if(key==='color'||key==='accent') sw=COLORS[v].c;rare=!!L.opts[v].r;}
+    const m=map.get(label)||{label,sw,rare,p:0};
+    m.p+=0.25;map.set(label,m);
+  }
+  return [...map.values()].sort((p,q)=>q.p-p.p);
+}
+
+/* ================= actions ================= */
+function sellFish(f){
+  const p=sellPrice(f);
+  S.coins+=p;S.stats.sold++;
+  S.fish=S.fish.filter(x=>x!==f);
+  S.eggs.forEach(e=>{if(e.carrier===f.id) e.carrier=null;});
+  return p;
+}
+function collectPile(){
+  const n=Math.floor(S.pile);
+  if(n<1) return 0;
+  S.pile-=n;S.coins+=n;S.stats.earned+=n;
+  return n;
+}
+function needsAttention(){
+  if(!S) return false;
+  return S.fish.some(f=>f.hunger<35||f.sick)||S.waste>55||S.algae>75||S.filter<15||S.pile>=1;
+}
+function dayLight(){
+  const d=new Date(),h=d.getHours()+d.getMinutes()/60;
+  const up=clamp((h-5.5)/2.5,0,1),down=clamp((20.5-h)/2.5,0,1);
+  return Math.min(up,down);
+}
+/* ================= sound (synthesized, no files) ================= */
+const SND={ctx:null,master:null,noiseBuf:null,lastEat:0,lastBub:0,lastTink:0};
+function audioResume(){
+  try{
+    if(!SND.ctx){
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC) return;
+      SND.ctx=new AC();
+      SND.master=SND.ctx.createGain();
+      SND.master.gain.value=0.55;
+      SND.master.connect(SND.ctx.destination);
+    }
+    if(SND.ctx.state==='suspended') SND.ctx.resume().catch(()=>{});
+  }catch(e){}
+}
+const soundOn=()=>!!(SND.ctx&&S&&S.sound&&SND.ctx.state!=='closed');
+function tone(freq,dur,o){
+  if(!soundOn()) return;
+  o=o||{};
+  try{
+    const c=SND.ctx,t=c.currentTime+(o.delay||0),vol=o.vol||0.12;
+    const osc=c.createOscillator(),g=c.createGain();
+    osc.type=o.type||'sine';
+    if(o.j) freq*=1+(Math.random()*2-1)*o.j;
+    osc.frequency.setValueAtTime(freq,t);
+    if(o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30,freq*o.slide),t+dur);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+(o.attack||0.006));
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(g);g.connect(SND.master);
+    osc.start(t);osc.stop(t+dur+0.03);
+  }catch(e){}
+}
+function noise(dur,o){
+  if(!soundOn()) return;
+  o=o||{};
+  try{
+    const c=SND.ctx,t=c.currentTime+(o.delay||0);
+    if(!SND.noiseBuf){
+      const n=c.sampleRate*1.5,b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0);
+      for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+      SND.noiseBuf=b;
+    }
+    const src=c.createBufferSource();src.buffer=SND.noiseBuf;
+    const f=c.createBiquadFilter();f.type=o.type||'lowpass';
+    f.frequency.setValueAtTime(o.freq||1000,t);
+    if(o.sweep) f.frequency.exponentialRampToValueAtTime(Math.max(60,(o.freq||1000)*o.sweep),t+dur);
+    f.Q.value=o.q||0.8;
+    const g=c.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(o.vol||0.12,t+Math.min(0.05,dur/3));
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.connect(f);f.connect(g);g.connect(SND.master);
+    src.start(t,Math.random()*0.5);src.stop(t+dur+0.03);
+  }catch(e){}
+}
+const sfx={
+  tap:()=>tone(620,0.05,{type:'square',vol:0.04,j:0.04}),
+  tab:()=>{tone(520,0.05,{type:'triangle',vol:0.08});tone(780,0.06,{type:'triangle',vol:0.06,delay:0.045});},
+  open:()=>tone(440,0.09,{type:'triangle',vol:0.07,slide:1.4}),
+  feed:()=>{for(let i=0;i<5;i++) tone(700+Math.random()*500,0.07,{slide:1.7,vol:0.07,delay:i*0.07+Math.random()*0.03});},
+  eat:()=>{const n=performance.now();if(n-SND.lastEat<120) return;SND.lastEat=n;tone(420+Math.random()*260,0.07,{slide:1.8,vol:0.06});},
+  bubble:()=>{const n=performance.now();if(n-SND.lastBub<900) return;SND.lastBub=n;tone(380+Math.random()*420,0.1,{slide:1.7,vol:0.035});},
+  water:()=>{noise(0.7,{freq:1800,sweep:0.25,vol:0.14,q:0.6});tone(300,0.3,{slide:2,vol:0.04,delay:0.35});},
+  rinse:()=>noise(0.45,{freq:1400,sweep:0.4,vol:0.1}),
+  scrub:()=>{for(let i=0;i<4;i++) noise(0.09,{type:'highpass',freq:2500,vol:0.09,delay:i*0.11});},
+  heal:()=>[523,659,784,1047].forEach((f,i)=>tone(f,0.14,{type:'triangle',vol:0.09,delay:i*0.07})),
+  sick:()=>{tone(330,0.18,{type:'triangle',vol:0.09});tone(247,0.28,{type:'triangle',vol:0.09,delay:0.16});},
+  coin:()=>{tone(988,0.07,{type:'square',vol:0.06,j:0.02});tone(1319,0.18,{type:'square',vol:0.06,delay:0.07,j:0.02});},
+  ping:i=>{
+    const deg=[0,2,4,7,9,12,14,16,19,21][Math.min(9,Math.max(0,i|0))],f=740*Math.pow(2,deg/12);
+    tone(f,0.17,{type:'triangle',vol:0.075,j:0.002});tone(f*2,0.1,{type:'sine',vol:0.025,delay:0.01});
+  },
+  levelup:()=>[440,554,659,880,1109].forEach((f,i)=>{tone(f,0.12,{type:'triangle',vol:0.08,delay:i*0.055});tone(f*2,0.08,{vol:0.02,delay:i*0.055});}),
+  discover:()=>{[523,659,784,1047,1319].forEach((f,i)=>tone(f,0.16,{type:'triangle',vol:0.085,delay:i*0.075}));tone(2093,0.35,{type:'sine',vol:0.04,delay:0.4});tone(2637,0.3,{type:'sine',vol:0.03,delay:0.46});},
+  sparkle:()=>{tone(1568+Math.random()*300,0.12,{vol:0.05});tone(2093+Math.random()*400,0.16,{vol:0.04,delay:0.07});},
+  tink:()=>{const n=performance.now();if(n-SND.lastTink<90) return;SND.lastTink=n;tone(520+Math.random()*280,0.11,{slide:1.6,vol:0.055});},
+  buy:()=>{tone(784,0.07,{type:'square',vol:0.055});tone(1047,0.07,{type:'square',vol:0.055,delay:0.07});tone(1568,0.2,{type:'square',vol:0.055,delay:0.14});},
+  error:()=>tone(200,0.16,{type:'square',vol:0.06,slide:0.65}),
+  breed:()=>[392,494,587,784].forEach((f,i)=>tone(f,0.16,{type:'sine',vol:0.1,delay:i*0.09})),
+  hatch:()=>[523,659,784,659,1047].forEach((f,i)=>tone(f,0.13,{type:'triangle',vol:0.1,delay:i*0.09})),
+  chime:()=>{tone(659,0.18,{type:'sine',vol:0.09});tone(880,0.3,{type:'sine',vol:0.09,delay:0.12});},
+  fish:()=>tone(540,0.08,{type:'sine',vol:0.08,slide:1.6})
+};
+/* ================= sprite helpers ================= */
+const SPRITES=new Map();
+const rgba=(hex,a)=>{const c=hexRgb(hex);return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';};
+function prof(shape,u){
+  switch(shape){
+    case 'slim': return Math.pow(Math.sin(Math.PI*Math.min(1,u*0.92+0.04)),0.7);
+    case 'oval': case 'bottom': {const c=.42,d=u<c?(c-u)/c:(u-c)/(1-c);return Math.sqrt(Math.max(0,1-d*d));}
+    case 'round': case 'disc': return Math.sqrt(Math.max(0,1-Math.pow(2*u-1,2)));
+    case 'tall': return Math.max(0,1-Math.pow(Math.abs(u-0.5)*2,1.5));
+    case 'long': return Math.pow(Math.sin(Math.PI*(u*0.94+0.03)),0.3);
+  }
+  return 1;
+}
+function getSprite(f,stage,sick){
+  const key=f.id+'|'+stage+'|'+(sick?1:0);
+  let s=SPRITES.get(key);
+  if(!s){
+    const k=kindOf(f);
+    s=k==='shrimp'?buildShrimp(f,stage,sick):(k==='jelly'?buildJelly(f,stage,sick):buildFishSprite(f,stage,sick));
+    SPRITES.set(key,s);
+  }
+  return s;
+}
+function gridToCanvas(g,W,Hc){
+  const cv=document.createElement('canvas');cv.width=W;cv.height=Hc;
+  const c=cv.getContext('2d');
+  for(let y=0;y<Hc;y++) for(let x=0;x<W;x++) if(g[y][x]){c.fillStyle=g[y][x];c.fillRect(x,y,1,1);}
+  return cv;
+}
+const emptyGrid=(W,Hc)=>Array.from({length:Hc},()=>new Array(W).fill(null));
+
+/* ================= fish sprite ================= */
+function buildFishSprite(f,stage,sick){
+  const sp=spriteSpec(f),ph=phenotype(f);
+  const tc=c=>sick?mixHex(c,'#7d8a70',0.55):c;
+  const sm=(0.88+0.12*ph.size)*1.25, stm=[0.45,0.75,1][stage];
+  const L=Math.max(5,Math.round(sp.len*sm*stm)), H=Math.max(3,Math.round(sp.hei*sm*stm));
+  const tt=ph.tail;
+  const TL=Math.max(2,Math.round(L*[0.34,0.3,0.4,0.62,0.8][tt]*sp.tailMul));
+  const TH=Math.max(3,Math.round(H*[0.9,0.75,1.3,1.25,0.6][tt]*(sp.tailMul>1?1.1:1)));
+  const FH=Math.min(Math.round(H*0.85),Math.round(H*[0,0.3,0.62,0.85][ph.fin]*sp.finMul));
+  const padT=Math.max(FH,Math.ceil((TH-H)/2))+2;
+  const padB=Math.max(5,Math.ceil((TH-H)/2)+2)+(tt===3?Math.round(TL*0.2):0);
+  const W=L+TL+2, Hc=padT+H+padB;
+  const g=emptyGrid(W,Hc);
+  const base=COLORS[ph.color].c, acc=COLORS[ph.accent].c;
+  const hi=lighten(base,0.28), lo=darken(base,0.28);
+  const bodyTop=new Array(L).fill(-1), bodyBot=new Array(L).fill(-1);
+  const midY=Math.floor(H/2);
+  for(let x=0;x<L;x++){
+    const u=(x+0.5)/L;
+    let hh=prof(sp.shape,u)*H/2;
+    if(sp.shape==='bottom') hh*=1.25;
+    for(let y=0;y<H;y++){
+      const dy=y+0.5-H/2;
+      const inside=sp.shape==='bottom'?(dy>=-hh&&dy<=hh*0.22):(Math.abs(dy)<=hh);
+      if(!inside) continue;
+      const v=dy/Math.max(hh,0.6);
+      let col=v<-0.45?hi:(v>0.5?lo:base);
+      const hs=hash2(x,y);
+      let on=false;
+      switch(ph.pattern){
+        case 1: on=(y===midY||(H>=10&&y===midY-1))&&u>0.12&&u<0.96;break;
+        case 2: on=(hs%9===0)&&u>0.2;break;
+        case 3: on=u>0.25&&u<0.85&&(x%4<2);break;
+        case 4: on=v>0.15&&u>0.1;break;
+        case 5: on=u<0.3;break;
+        case 6: on=(hs%4===0);break;
+        case 7: on=((x+y)%4<2)&&u>0.15;break;
+      }
+      if(on) col=v<-0.45?lighten(acc,0.15):(v>0.5?darken(acc,0.2):acc);
+      if(ph.sheen===2&&v<-0.45) col=mixHex(col,'#ffffff',0.55);
+      g[padT+y][1+x]=tc(col);
+      if(bodyTop[x]<0) bodyTop[x]=y;
+      bodyBot[x]=y;
+    }
+  }
+  const cyB=padT+H/2;
+  for(let t=0;t<TL;t++){
+    const x=1+L+t,q=(t+0.5)/TL;
+    let th,drop=0;
+    switch(tt){
+      case 0: th=TH/2*(0.45+0.55*q);break;
+      case 1: {const d=(q-0.4)/0.6;th=Math.max(TH/2*0.3,TH/2*Math.sqrt(Math.max(0,1-d*d)));break;}
+      case 2: th=TH/2*(0.3+0.7*q);break;
+      case 3: th=TH/2*(0.35+0.65*Math.sin(Math.PI*Math.pow(q,0.75)));drop=t*0.16;break;
+      default: th=TH/2*(0.45+0.55*q);
+    }
+    for(let y=0;y<Hc;y++){
+      const dy=y+0.5-cyB-drop,ad=Math.abs(dy);
+      let inT=ad<=th;
+      if(tt===0&&q>0.35) inT=inT&&ad>=(q-0.35)/0.65*th*0.75;
+      if(tt===4) inT=(Math.abs(ad-th*0.92)<0.75||ad<0.55);
+      if(tt===2&&t===TL-1&&y%2===0) inT=false;
+      if(!inT) continue;
+      let col;
+      if(tt<=1) col=mixHex(base,acc,0.4);
+      else if(tt===3) col=mixHex(acc,lighten(acc,0.4),q*0.6);
+      else col=acc;
+      g[y][x]=tc(col);
+    }
+  }
+  if(FH>0){
+    const x0=Math.round(L*0.25),x1=Math.max(x0+2,Math.round(L*0.74));
+    for(let x=x0;x<x1&&x<L;x++){
+      const top=bodyTop[x];if(top<0) continue;
+      const u=(x-x0)/(x1-x0);
+      let h=ph.fin===3?FH*(0.7+0.3*Math.sin(u*Math.PI*3)):FH*Math.max(0.25,1-Math.abs(u-0.3)/0.7);
+      if(ph.fin===3&&x%3===0) h*=0.6;
+      const n=Math.max(1,Math.round(h));
+      for(let k=1;k<=n;k++){
+        const y=padT+top-k;
+        if(y>=1&&!g[y][1+x]) g[y][1+x]=tc(ph.fin===1?darken(base,0.1):mixHex(acc,base,0.2));
+      }
+    }
+  }
+  if(L>=9){
+    const x=Math.round(L*0.38),b=bodyBot[x];
+    if(b>=0){g[padT+b+1][1+x]=tc(darken(acc,0.1));if(L>=14) g[padT+b+2][1+x]=tc(darken(acc,0.1));}
+  }
+  if(L>=10){
+    const x=Math.round(L*0.3),y=padT+Math.floor(H*0.6);
+    if(g[y]&&g[y][1+x]) g[y][1+x]=tc(lighten(base,0.35));
+  }
+  {
+    const bx=Math.max(1,Math.round(L*0.16)),by=bodyTop[bx];
+    if(by>=0){
+      const ey=padT+Math.min(bodyBot[bx],by+Math.max(1,Math.round(H*0.24)));
+      g[ey][1+bx]='#0b1030';
+      if(L>=11&&g[ey][2+bx]) g[ey][2+bx]='#ffffff';
+    }
+  }
+  const oc=tc(darken(base,0.62));
+  const out=g.map(r=>r.slice());
+  for(let y=0;y<Hc;y++) for(let x=0;x<W;x++){
+    if(g[y][x]) continue;
+    if((y>0&&g[y-1][x])||(y<Hc-1&&g[y+1][x])||(x>0&&g[y][x-1])||(x<W-1&&g[y][x+1])) out[y][x]=oc;
+  }
+  return {cv:gridToCanvas(out,W,Hc),w:W,h:Hc,glow:ph.sheen===1,pearl:ph.sheen===2,glowRGB:[255,255,190],feet:Hc-3};
+}
+
+/* ================= shrimp sprite ================= */
+function buildShrimp(f,stage,sick){
+  const sp=spriteSpec(f),ph=phenotype(f);
+  const tc=c=>sick?mixHex(c,'#7d8a70',0.55):c;
+  const sm=(0.88+0.12*ph.size)*1.25, stm=[0.5,0.78,1][stage];
+  const L=Math.max(7,Math.round(sp.len*sm*stm)), H=Math.max(4,Math.round(sp.hei*sm*stm));
+  const ant=Math.max(3,Math.round(L*0.7));
+  const W=ant+L+5, Hc=H+Math.round(H*1.1)+9;
+  const g=emptyGrid(W,Hc);
+  const ghost=!!sp.ghost;
+  const base=ghost?mixHex(COLORS[ph.color].c,'#d8f0f5',0.62):COLORS[ph.color].c;
+  const acc=COLORS[ph.accent].c;
+  const x0=ant+2,yTop=Math.round(H*0.9)+3;
+  const cx=t=>x0+t*(L-1);
+  const cy=t=>yTop+H*0.55-Math.sin(Math.PI*Math.min(1,t*0.9))*H*0.3+(t>0.72?(t-0.72)*H*2.4:0);
+  const rad=t=>t<0.2?H*0.44:Math.max(0.9,H*0.5*(1-0.62*Math.max(0,t-0.2)));
+  const steps=L*5;
+  const alpha=ghost?0.6:1;
+  const body=new Map();
+  for(let k=0;k<=steps;k++){
+    const t=k/steps,px=cx(t),py=cy(t),r=rad(t);
+    for(let y=Math.floor(py-r);y<=Math.ceil(py+r);y++) for(let x=Math.floor(px-r);x<=Math.ceil(px+r);x++){
+      const dx=x+0.5-px,dy=y+0.5-py;
+      if(dx*dx+dy*dy<=r*r){
+        const key=y*1000+x,prev=body.get(key);
+        if(!prev||t>prev.t) body.set(key,{x,y,t,v:dy/Math.max(r,0.8)});
+      }
+    }
+  }
+  const midY=Math.round(yTop+H*0.5);
+  for(const b of body.values()){
+    const hs=hash2(b.x,b.y);
+    let col=b.v<-0.4?lighten(base,0.25):(b.v>0.45?darken(base,0.25):base);
+    let on=false;
+    switch(ph.pattern){
+      case 1: on=b.v>-0.85&&b.v<-0.3&&b.t>0.12;break;
+      case 2: on=(hs%7===0)&&b.t>0.15;break;
+      case 3: on=(b.t>0.34&&b.t<0.5)||(b.t>0.7&&b.t<0.84);break;
+      case 4: on=b.v>0.3;break;
+      case 5: on=b.t<0.22;break;
+      case 6: on=(hs%4===0);break;
+      case 7: on=((b.x+b.y)%4<2)&&b.t>0.1;break;
+    }
+    if(on) col=b.v<-0.4?lighten(acc,0.15):(b.v>0.45?darken(acc,0.2):acc);
+    if(ph.sheen===2&&b.v<-0.4) col=mixHex(col,'#ffffff',0.55);
+    g[b.y][b.x]=ghost&&!on?rgba(tc(col),alpha):tc(col);
+  }
+  if(ghost){
+    for(let t=0.25;t<=0.82;t+=0.04){const x=Math.round(cx(t)),y=Math.round(cy(t)+rad(t)*0.1);if(g[y]&&g[y][x]) g[y][x]=rgba(tc(darken(acc,0.2)),0.85);}
+  }
+  const tipX=Math.round(cx(1)),tipY=Math.round(cy(1));
+  const fanCol=ghost?rgba(tc(lighten(base,0.2)),0.75):tc(mixHex(base,acc,0.35));
+  [[1,-1],[1,0],[1,1],[2,0],[0,2],[1,2]].forEach(o=>{const x=tipX+o[0],y=tipY+o[1];if(g[y]&&x<W&&!g[y][x]) g[y][x]=fanCol;});
+  const legCol=tc(darken(base,0.35));
+  for(let t=0.14;t<0.6;t+=0.1){
+    const x=Math.round(cx(t)),y=Math.round(cy(t)+rad(t))+1;
+    if(g[y]&&!g[y][x]) g[y][x]=ghost?rgba(legCol,0.7):legCol;
+    if(L>=12&&g[y+1]&&!g[y+1][x-1]) g[y+1][x-1]=ghost?rgba(legCol,0.6):legCol;
+  }
+  const ac=tc(lighten(acc,0.3));
+  const hx=cx(0)-rad(0)*0.7,hy=cy(0)-rad(0)*0.5;
+  for(let k=0;k<ant;k++){
+    const x=Math.round(hx-k),y=Math.round(hy-k*0.3-Math.sin(k*0.35)*0.8);
+    if(g[y]&&x>=0&&!g[y][x]) g[y][x]=rgba(ac,0.85);
+    if(k<ant*0.7){const y2=Math.round(hy+0.5+k*0.12);if(g[y2]&&x>=0&&!g[y2][x]) g[y2][x]=rgba(ac,0.65);}
+  }
+  const rx=Math.round(cx(0)-rad(0)),ry=Math.round(cy(0)-rad(0))-1;
+  if(g[ry]&&!g[ry][rx]) g[ry][rx]=tc(darken(base,0.1));
+  const ex=Math.round(cx(0)-rad(0)*0.35),ey=Math.round(cy(0)-rad(0)*0.45);
+  if(g[ey]&&g[ey][ex]) g[ey][ex]='#0b1030';
+  let feet=0;
+  for(let y=0;y<Hc;y++) for(let x=0;x<W;x++) if(g[y][x]) feet=Math.max(feet,y);
+  if(!ghost){
+    const oc=tc(darken(base,0.62));
+    const out=g.map(r=>r.slice());
+    for(let y=0;y<Hc;y++) for(let x=0;x<W;x++){
+      if(g[y][x]) continue;
+      if((y>0&&g[y-1][x]&&body.has((y-1)*1000+x))||(y<Hc-1&&g[y+1][x]&&body.has((y+1)*1000+x))||(x>0&&g[y][x-1]&&body.has(y*1000+x-1))||(x<W-1&&g[y][x+1]&&body.has(y*1000+x+1))) out[y][x]=oc;
+    }
+    for(let y=0;y<Hc;y++) for(let x=0;x<W;x++) g[y][x]=out[y][x];
+  }
+  const eggPos={x:Math.round(cx(0.78)),y:Math.round(cy(0.78)+rad(0.78))+2};
+  return {cv:gridToCanvas(g,W,Hc),w:W,h:Hc,glow:ph.sheen===1,pearl:ph.sheen===2,glowRGB:[255,255,190],feet:feet+1,eggPos};
+}
+
+/* ================= card previews ================= */
+function paintFish(cv,f,opts){
+  opts=opts||{};
+  const c=cv.getContext('2d');
+  c.imageSmoothingEnabled=false;
+  c.clearRect(0,0,cv.width,cv.height);
+  const st=opts.stage!=null?opts.stage:stageOf(f);
+  const s=getSprite(f,st,opts.sick!=null?opts.sick:f.sick);
+  const x=Math.round((cv.width-s.w)/2),y=Math.round((cv.height-s.h)/2);
+  if(s.glow){
+    const gc=s.glowRGB.join(',');
+    const gr=c.createRadialGradient(cv.width/2,cv.height/2,2,cv.width/2,cv.height/2,Math.max(s.w,s.h)*0.85);
+    gr.addColorStop(0,'rgba('+gc+',.5)');gr.addColorStop(1,'rgba('+gc+',0)');
+    c.fillStyle=gr;c.fillRect(0,0,cv.width,cv.height);
+  }
+  c.drawImage(s.cv,x,y);
+  if(opts.silhouette){
+    c.globalCompositeOperation='source-atop';
+    c.fillStyle='#10233a';c.fillRect(0,0,cv.width,cv.height);
+    c.globalCompositeOperation='source-over';
+  }
+}
+function previewFish(spId,hyb){
+  const kind=SP[spId].kind||'fish';
+  const PV={cherry:[1,2,1],ghost:[4,2,0],amano:[3,4,1],moon:[5,7,4],nettle:[2,0,1],mat:[3,4,2],comb:[4,5,2],immortal:[11,1,0],box:[5,4,0]};
+  const pv=PV[spId]||[1,2,1];
+  const g=kind==='shrimp'?{color:[pv[0],pv[0]],accent:[pv[1],pv[1]],pattern:[pv[2],pv[2]],tail:[0,0],fin:[0,0],size:[1,1],sheen:[0,0]}
+    :kind==='jelly'?{color:[pv[0],pv[0]],accent:[pv[1],pv[1]],pattern:[pv[2],pv[2]],tail:[1,1],fin:[1,1],size:[1,1],sheen:[0,0]}
+    :{color:[5,5],accent:[2,2],pattern:[1,1],tail:[0,0],fin:[1,1],size:[1,1],sheen:[0,0]};
+  const o={id:'prev-'+spId+(hyb?'-'+hyb:''),sp:spId,g,age:999,sick:false};
+  if(hyb) o.hyb=hyb;
+  return o;
+}
+function paintAllCanvases(root){
+  $$('canvas[data-fish]',root).forEach(cv=>{
+    const f=S.fish.find(x=>x.id==cv.dataset.fish);
+    if(f) paintFish(cv,f);
+  });
+  $$('canvas[data-species]',root).forEach(cv=>{
+    const p=previewFish(cv.dataset.species);
+    const known=!!S.book.sp[cv.dataset.species];
+    paintFish(cv,p,{stage:2,silhouette:cv.dataset.sil==='1'&&!known});
+  });
+  $$('canvas[data-hyb]',root).forEach(cv=>{
+    const [a,b]=cv.dataset.hyb.split(':');
+    paintFish(cv,previewFish(a,b),{stage:2});
+  });
+  $$('canvas[data-polyp]',root).forEach(cv=>{
+    const p=S.polyps.find(x=>x.id==cv.dataset.polyp);
+    const c=cv.getContext('2d');c.clearRect(0,0,cv.width,cv.height);
+    if(!p) return;
+    c.save();c.translate(cv.width/2,cv.height-8);c.scale(2,2);
+    drawPolyp(c,p,0,0,0);
+    c.restore();
+  });
+}
+
+/* ================= polyps ================= */
+function drawPolyp(c,p,x,y,t){
+  const ph=phenotype(p);
+  const base=COLORS[ph.color].c,acc=COLORS[ph.accent].c;
+  const stalk=lighten(base,0.35);
+  const cnt=clamp(Math.floor(p.size)+1,1,8);
+  const OX=[-7,-3,1,5,-5,-1,3,7],OY=[0,1,0,1,-3,-2,-3,-2];
+  for(let i=0;i<cnt;i++){
+    const ox=x+OX[i],oy=y+OY[i];
+    R(c,'#7c8698',ox-1,oy,4,1);
+    R(c,stalk,ox,oy-3,2,3);
+    const sw=Math.sin(t*2+i)>0?1:0;
+    R(c,acc,ox-1+sw,oy-5,1,2);R(c,acc,ox+2-sw,oy-5,1,2);R(c,acc,ox,oy-5,2,1);
+    if(p.chill>10&&Math.floor(t*3+i)%2===0) R(c,'#bfe9ff',ox,oy-7,1,1);
+  }
+}
+
+/* ================= tank scene ================= */
+const SW=160,SH=120,SAND_Y=104;
+const scene={cv:null,c:null,bg:null,bgTheme:'',t:0,rt:new Map(),food:[],bubbles:[],fx:[],shells:[],last:0,decorMode:false,running:false};
+const R=(c,col,x,y,w,h)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),w,h);};
+const plantXs=()=>S.decor.slots.map((id,i)=>(id&&DECOR[id].plant)?SLOT_X[i]:null).filter(x=>x!=null);
+
+function buildBg(th){
+  const cv=document.createElement('canvas');cv.width=SW;cv.height=SH;
+  const c=cv.getContext('2d');
+  for(let y=0;y<SAND_Y;y+=2){R(c,mixHex(th.top,th.bot,Math.pow(y/SAND_Y,0.85)),0,y,SW,2);}
+  c.fillStyle=th.sil;
+  if(th.kind==='rocks'){
+    for(let x=0;x<SW;x++){
+      const h=26+Math.round(10*Math.sin(x*0.045+1)+7*Math.sin(x*0.13+2)+4*Math.sin(x*0.31));
+      c.fillRect(x,SAND_Y-h,1,h);
+    }
+  }else if(th.kind==='reef'){
+    for(let i=0;i<9;i++){
+      const bx=6+i*18+(hash2(i,3)%7),bh=14+hash2(i,9)%22;
+      R(c,th.sil,bx,SAND_Y-bh,7,bh);R(c,th.sil,bx+2,SAND_Y-bh-4,3,4);
+      if(i%2) {R(c,th.sil,bx-3,SAND_Y-bh+6,3,8);R(c,th.sil,bx+7,SAND_Y-bh+3,3,10);}
+    }
+  }else{
+    for(let i=0;i<14;i++){
+      const bx=4+i*12+(hash2(i,1)%5),bh=24+hash2(i,4)%30;
+      for(let k=0;k<bh;k+=2) R(c,th.sil,bx+Math.round(Math.sin(k*0.2+i)*1.5),SAND_Y-k,2,3);
+    }
+  }
+  c.fillStyle='rgba(5,20,40,.18)';c.fillRect(0,SAND_Y-44,SW,44);
+  for(let y=SAND_Y;y<SH;y++){
+    R(c,y<SAND_Y+3?th.sand:mixHex(th.sand,th.sand2,(y-SAND_Y)/(SH-SAND_Y)),0,y,SW,1);
+  }
+  for(let x=0;x<SW;x++){
+    const b=Math.round(Math.sin(x*0.22)*0.9);
+    R(c,th.sand,x,SAND_Y-1+b,1,1);
+    const h=hash2(x,77);
+    if(h%5===0) R(c,th.sand2,x,SAND_Y+2+(h>>3)%(SH-SAND_Y-3),1,1);
+    if(h%11===0) R(c,lighten(th.sand,0.3),x,SAND_Y+1+(h>>5)%(SH-SAND_Y-3),1,1);
+  }
+  return cv;
+}
+
+const DRAW={
+  kelp:(c,x,y,t)=>{for(let i=0;i<3;i++){const bx=x-6+i*6,h=26+(i%2)*9;for(let k=0;k<h;k+=2){const sw=Math.round(Math.sin(t*1.3+k*0.18+i)*(k/h)*2.4);R(c,k%4?'#2e9e57':'#3cb56a',bx+sw,y-k-2,2,3);}}},
+  fern:(c,x,y,t)=>{for(let i=-3;i<=3;i++){const h=12-Math.abs(i)*2;for(let k=0;k<h;k++){const sw=Math.round(Math.sin(t*1.6+k*0.3+i)*(k/h)*1.5);R(c,k%3?'#3f9f4b':'#58bd5e',x+i*2+Math.round(i*k/9)+sw,y-k-1,2,2);}}},
+  redweed:(c,x,y,t)=>{for(let i=0;i<4;i++){const bx=x-6+i*4,h=16+(i*5)%9;for(let k=0;k<h;k+=2){const sw=Math.round(Math.sin(t*1.1+k*0.25+i*2)*(k/h)*2);R(c,k%4?'#b02e56':'#d04a70',bx+sw,y-k-2,3,2);}}},
+  pebbles:(c,x,y)=>{R(c,'#6b7486',x-9,y-3,7,4);R(c,'#8892a4',x-9,y-3,7,1);R(c,'#7c8698',x-2,y-5,8,6);R(c,'#a0a9ba',x-2,y-5,8,1);R(c,'#5e677a',x+5,y-3,6,4);R(c,'#7c8698',x+5,y-3,6,1);},
+  shell:(c,x,y)=>{R(c,'#f0c8c0',x-6,y-7,12,7);R(c,'#ffe3dc',x-5,y-8,10,1);R(c,'#e0a9a0',x-6,y-4,12,1);R(c,'#e0a9a0',x-2,y-7,1,7);R(c,'#e0a9a0',x+2,y-7,1,7);R(c,'#c98d85',x-6,y-1,12,1);},
+  rock:(c,x,y)=>{R(c,'#59636f',x-11,y-8,22,8);R(c,'#6c7784',x-8,y-13,16,5);R(c,'#84909c',x-7,y-13,14,1);R(c,'#3f8a4a',x-9,y-9,6,2);R(c,'#3f8a4a',x+2,y-14,4,2);R(c,'#47515d',x-11,y-1,22,1);},
+  wood:(c,x,y)=>{R(c,'#6b4a2f',x-16,y-5,30,5);R(c,'#8a6443',x-16,y-5,30,1);R(c,'#6b4a2f',x-12,y-12,5,8);R(c,'#6b4a2f',x+4,y-16,5,12);R(c,'#8a6443',x+4,y-16,1,12);R(c,'#4d331f',x-16,y-1,30,1);R(c,'#8a6443',x+9,y-19,3,4);},
+  chest:(c,x,y,t)=>{const open=Math.sin(t*0.6)>0.92;R(c,'#7a4a24',x-9,y-9,18,9);R(c,'#a0653a',x-9,y-9,18,2);R(c,'#e0b43a',x-9,y-5,18,1);R(c,'#e0b43a',x-1,y-7,3,4);R(c,'#4f2e14',x-9,y-1,18,1);if(open){R(c,'#7a4a24',x-9,y-14,18,4);R(c,'#ffe27a',x-5,y-11,3,2);R(c,'#ffe27a',x+1,y-12,3,2);}else{R(c,'#8a5530',x-9,y-12,18,3);R(c,'#a0653a',x-9,y-12,18,1);}},
+  bubbler:(c,x,y)=>{R(c,'#556070',x-4,y-4,8,4);R(c,'#7d8a9c',x-4,y-4,8,1);R(c,'#3c4654',x-2,y-7,4,3);},
+  castle:(c,x,y)=>{R(c,'#c9b48a',x-15,y-16,30,16);R(c,'#ddcaa0',x-15,y-16,30,2);R(c,'#c9b48a',x-15,y-24,8,8);R(c,'#c9b48a',x+7,y-24,8,8);R(c,'#ddcaa0',x-15,y-26,2,2);R(c,'#ddcaa0',x-11,y-26,2,2);R(c,'#ddcaa0',x+7,y-26,2,2);R(c,'#ddcaa0',x+11,y-26,2,2);R(c,'#ddcaa0',x-4,y-20,2,4);R(c,'#ddcaa0',x+2,y-20,2,4);R(c,'#33284a',x-4,y-10,8,10);R(c,'#33284a',x-12,y-19,3,4);R(c,'#33284a',x+9,y-19,3,4);R(c,'#a8946c',x-15,y-1,30,1);},
+  arch:(c,x,y)=>{R(c,'#8f9aa8',x-16,y-22,6,22);R(c,'#8f9aa8',x+10,y-22,6,22);R(c,'#a8b3c0',x-16,y-22,6,2);R(c,'#a8b3c0',x+10,y-22,6,2);R(c,'#8f9aa8',x-16,y-28,32,6);R(c,'#a8b3c0',x-16,y-28,32,2);R(c,'#7a8492',x-7,y-22,14,2);R(c,'#3f8a4a',x-16,y-14,4,3);R(c,'#3f8a4a',x+12,y-24,4,3);R(c,'#6f7a88',x-16,y-1,6,1);R(c,'#6f7a88',x+10,y-1,6,1);}
+};
+
+function sceneInit(){
+  scene.cv=$('#scene');scene.c=scene.cv.getContext('2d');scene.c.imageSmoothingEnabled=false;
+  scene.cv.addEventListener('pointerdown',onScenePointer);
+}
+function floorY(f,s){return SAND_Y+3-s.feet+s.h/2;}
+function rtFor(f){
+  let r=scene.rt.get(f.id);
+  if(!r){
+    const kind=kindOf(f),s=getSprite(f,stageOf(f),f.sick);
+    r={x:rnd(20,140),y:kind==='fish'?rnd(20,90):(kind==='jelly'?rnd(25,60):floorY(f,s)),tx:80,ty:60,dir:Math.random()<0.5?-1:1,wait:rnd(0,1.5),phase:rnd(0,6.28),pp:Math.random(),
+      turn:0,shim:0,flee:0,chase:0,chaseT:0,nibble:false,hop:0,hopV:0,molt:rnd(90,240),sleep:false};
+    scene.rt.set(f.id,r);
+  }
+  return r;
+}
+function feedFlakes(){
+  if(scene.food.length>30) return false;
+  for(let i=0;i<7;i++){
+    const fx=rnd(28,132);
+    scene.food.push({x:fx,y:rnd(2,10),vy:rnd(7,12),floor:false,t:0});
+    burst('plunge',fx,3,{n:2});
+  }
+  ripple(rnd(40,70),2,15,{ry:0.25});ripple(rnd(90,120),2,12,{ry:0.25,dur:0.8});
+  return true;
+}
+function addFx(type,x,y){scene.fx.push({type,x,y,t:0});if(scene.fx.length>40) scene.fx.shift();}
+function onStageUp(f,st){
+  if(st>0) qJuice({kind:'grow',id:f.id});
+  if(kindOf(f)==='shrimp'&&st>0){
+    const r=scene.rt.get(f.id);
+    if(r) scene.shells.push({id:f.id,x:r.x,y:r.y,t:40});
+  }
+}
+function nearestFlake(r,floorOnly,maxD){
+  let best=null,bd=maxD||1e9;
+  for(const fl of scene.food){
+    if(floorOnly&&!fl.floor) continue;
+    const d=Math.hypot(fl.x-r.x,fl.y-r.y);
+    if(d<bd){bd=d;best=fl;}
+  }
+  return best;
+}
+function traitSpeed(tr){return tr==='lazy'?0.7:(tr==='bold'?1.15:(tr==='playful'?1.1:(tr==='shy'?0.9:1)));}
+
+function pickFishTarget(f,r,sp,st,night){
+  const tr=f.trait,plants=plantXs();
+  r.nibble=false;
+  if(r.chase){
+    const o=S.fish.find(x=>x.id===r.chase),orr=o&&scene.rt.get(o.id);
+    if(orr&&r.chaseT>0){r.tx=orr.x;r.ty=orr.y;return;}
+    r.chase=0;
+  }
+  if(night>0.6){r.tx=rnd(10,150);r.ty=SAND_Y-rnd(6,24);return;}
+  if(tr==='playful'&&Math.random()<0.2){
+    const others=S.fish.filter(x=>x.id!==f.id&&kindOf(x)==='fish'&&scene.rt.get(x.id));
+    if(others.length){const o=pick(others),orr=scene.rt.get(o.id);r.chase=o.id;r.chaseT=rnd(4,8);r.tx=orr.x;r.ty=orr.y;return;}
+  }
+  if(sp.algae&&S.algae>10&&Math.random()<0.4){r.nibble=true;r.tx=Math.random()<0.5?9:151;r.ty=rnd(35,92);return;}
+  if((st===0||tr==='shy')&&plants.length&&Math.random()<0.7){r.tx=pick(plants)+rnd(-9,9);r.ty=SAND_Y-rnd(5,24);return;}
+  if(tr==='shy'){r.tx=rnd(10,150);r.ty=rnd(SAND_Y-26,SAND_Y-6);return;}
+  const buddies=S.fish.filter(x=>x.id!==f.id&&x.sp===f.sp&&scene.rt.get(x.id));
+  if(buddies.length&&(tr==='social'?Math.random()<0.8:Math.random()<0.22)){
+    const br=scene.rt.get(pick(buddies).id);
+    r.tx=clamp(br.x+rnd(-14,14),8,152);r.ty=clamp(br.y+rnd(-8,8),10,SAND_Y-8);return;
+  }
+  const band=tr==='bold'?rnd(0.1,0.9):sp.dep;
+  r.tx=rnd(10,150);r.ty=clamp(14+band*84+rnd(-16,16),10,SAND_Y-8);
+}
+function moveFish(f,r,sp,st,night,dt,speed,hungryFood){
+  if(hungryFood){
+    const fl=nearestFlake(r,false);
+    if(fl){r.tx=fl.x;r.ty=fl.y;speed*=1.7;r.wait=0;r.chase=0;}
+  }
+  if(r.chase){
+    speed*=1.45;r.chaseT-=dt;
+    const o=S.fish.find(x=>x.id===r.chase),orr=o&&scene.rt.get(o.id);
+    if(orr){
+      r.tx=orr.x;r.ty=orr.y;
+      if(Math.hypot(orr.x-r.x,orr.y-r.y)<9){orr.flee=1.2;r.chaseT-=1.5;addFx('bub',orr.x,orr.y);}
+    }
+  }
+  if(r.wait>0){r.wait-=dt;return;}
+  const dx=r.tx-r.x,dy=r.ty-r.y,d=Math.hypot(dx,dy);
+  if(d<2.5){
+    r.wait=rnd(0.3,2.4)*(f.trait==='lazy'?2.2:1)*(r.nibble?2.5:1);
+    if(r.nibble) S.algae=Math.max(0,S.algae-1.2);
+    pickFishTarget(f,r,sp,st,night);
+  }else{
+    const s=Math.min(d,speed*dt);
+    r.x+=dx/d*s;r.y+=dy/d*s;
+    if(Math.abs(dx)>3){const nd=dx<0?-1:1;if(nd!==r.dir){r.dir=nd;r.turn=0.2;}}
+  }
+}
+function moveShrimp(f,r,sp,st,night,dt,speed,hungryFood,s){
+  const fy=floorY(f,s);
+  if(r.hop>0){
+    r.hop-=dt;r.hopV+=70*dt;r.y+=r.hopV*dt;
+    r.x+=r.dir*speed*1.5*dt;
+    if(r.y>=fy){r.y=fy;r.hop=0;}
+    r.x=clamp(r.x,6,154);
+    return;
+  }
+  r.y=fy;
+  if(hungryFood){
+    const fl=nearestFlake(r,true);
+    if(fl){r.tx=fl.x;speed*=2;r.wait=0;}
+  }
+  if(r.wait>0){r.wait-=dt;return;}
+  const dx=r.tx-r.x;
+  if(Math.abs(dx)<2){
+    r.wait=rnd(1,4)*(f.trait==='lazy'?1.8:1);
+    r.tx=rnd(10,150);
+    if(f.trait==='shy'&&plantXs().length&&Math.random()<0.6) r.tx=pick(plantXs())+rnd(-10,10);
+    if(st>0&&Math.random()<(f.trait==='playful'?0.3:0.1)&&night<0.5){r.hop=1;r.hopV=-34;}
+  }else{
+    r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*dt);
+    const nd=dx<0?-1:1;if(nd!==r.dir){r.dir=nd;r.turn=0.2;}
+  }
+}
+function moveJelly(f,r,sp,st,night,dt,speed,hungryFood,s){
+  if(sp.floor){
+    r.y=SAND_Y+2-s.h/2+2;
+    if(r.wait>0){r.wait-=dt;return;}
+    const dx=r.tx-r.x;
+    if(Math.abs(dx)<2){r.wait=rnd(6,16);r.tx=rnd(14,146);}
+    else r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*0.5*dt);
+    return;
+  }
+  const up=r.pp<0.5;
+  let vy=up?-12*(1-r.pp*2*0.6):4.5;
+  if(r.y<r.ty-4) vy+=up?5:6;
+  if(r.y>r.ty+10) vy-=up?0:2;
+  r.y=clamp(r.y+vy*dt*(1-night*0.3),10,SAND_Y-s.h-4);
+  if(hungryFood){const fl=nearestFlake(r,false,60);if(fl){r.tx=fl.x;r.ty=fl.y-8;}}
+  const dx=r.tx-r.x;
+  if(Math.abs(dx)<3&&r.wait<=0){r.wait=rnd(2,6);}
+  if(r.wait>0){r.wait-=dt;if(Math.abs(dx)<3) return;}
+  if(Math.abs(dx)>=3){
+    r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*(up?1.4:0.5)*dt);
+    const nd=dx<0?-1:1;if(nd!==r.dir){r.dir=nd;}
+  }else if(r.wait<=0){
+    r.tx=rnd(14,146);r.ty=rnd(16,SAND_Y-40);
+  }
+  if(Math.abs(dx)<3){r.tx=rnd(14,146);r.ty=rnd(16,SAND_Y-40);}
+}
+
+function updateScene(dt){
+  const night=1-dayLight();
+  const alive=new Set();
+  const showSound=curTab==='tank'&&!sheetState;
+  for(const f of S.fish){
+    alive.add(f.id);
+    const r=rtFor(f),sp=SP[f.sp],st=stageOf(f),kind=kindOf(f),tr=f.trait;
+    const s=getSprite(f,st,f.sick);
+    if(r.mv===undefined){r.mv=0;r.wag=rnd(0,6.28);r.sq=0;}
+    const px=r.x,py=r.y;
+    r.sq=Math.max(0,r.sq-dt);
+    r.phase+=dt*(f.sick?2:4);
+    r.turn=Math.max(0,r.turn-dt);r.shim=Math.max(0,r.shim-dt);
+    if(r.flee>0) r.flee-=dt;
+    r.sleep=night>0.6&&!f.sick&&!(scene.food.length>0&&f.hunger<92);
+    const limit=tr==='greedy'?98:92;
+    const hungryFood=f.hunger<limit&&scene.food.length>0&&!r.sleep;
+    let speed=sp.spd*16*(st===0?1.25:1)*(f.sick?0.45:1)*(1-night*0.6)*traitSpeed(tr);
+    if(r.sleep) speed*=0.35;
+    if(r.flee>0) speed*=2.4;
+    if(kind==='jelly') r.pp=(r.pp+dt*0.4*(sp.pulse||1))%1;
+    if(kind==='fish'||sp.glide) moveFish(f,r,sp,st,night,dt,speed,hungryFood);
+    else if(kind==='shrimp') moveShrimp(f,r,sp,st,night,dt,speed,hungryFood,s);
+    else moveJelly(f,r,sp,st,night,dt,speed,hungryFood,s);
+    r.x=clamp(r.x,6,154);
+    if(kind==='fish') r.y=clamp(r.y,8,SAND_Y-4);
+    else if(sp.glide) r.y=clamp(r.y,8,SAND_Y-s.h/2-4);
+    r.mv+=(Math.hypot(r.x-px,r.y-py)/Math.max(dt,0.001)-r.mv)*Math.min(1,dt*6);
+    r.wag+=dt*(5+Math.min(r.mv,24)*0.3);
+    if(r.sleep&&showSound&&Math.random()<dt*0.45) addFx('z',r.x+(r.dir<0?-4:4),r.y-s.h/2-2);
+    if(kind==='shrimp'&&st>0){
+      r.molt-=dt;
+      if(r.molt<=0){r.molt=rnd(120,300);if(f.hunger>50&&!f.sick) scene.shells.push({id:f.id,x:r.x,y:r.y,t:40});}
+    }
+  }
+  for(const b of S.fish){
+    if(b.sp!=='box') continue;
+    const br=scene.rt.get(b.id);if(!br) continue;
+    for(const o of S.fish){
+      if(o===b||o.sp==='box'||kindOf(o)==='shrimp') continue;
+      const orr=scene.rt.get(o.id);
+      if(!orr||orr.flee>0||Math.hypot(orr.x-br.x,orr.y-br.y)>16) continue;
+      orr.flee=0.9;orr.wait=0;
+      orr.tx=clamp(orr.x+(orr.x-br.x)*3+rnd(-10,10),8,152);
+      orr.ty=clamp(orr.y+(orr.y-br.y)*3+rnd(-10,10),12,SAND_Y-10);
+      addFx('bub',orr.x,orr.y-4);
+    }
+  }
+  for(const id of [...scene.rt.keys()]) if(!alive.has(id)) scene.rt.delete(id);
+  /* food */
+  for(let i=scene.food.length-1;i>=0;i--){
+    const fl=scene.food[i];
+    if(fl.floor){
+      fl.t-=dt;
+      if(fl.t<=0){S.waste=Math.min(100,S.waste+0.35);scene.food.splice(i,1);continue;}
+    }else{
+      fl.y+=fl.vy*dt;
+      if(fl.y>=SAND_Y-2){fl.floor=true;fl.t=16;fl.y=SAND_Y-1;burst('sand',fl.x,SAND_Y-1,{n:3});}
+    }
+    let eaten=false;
+    for(const f of S.fish){
+      if(f.hunger>=95) continue;
+      const r=scene.rt.get(f.id);if(!r) continue;
+      const kind=kindOf(f);
+      const rx=kind==='jelly'?9:(kind==='shrimp'?5:6),ry=kind==='jelly'?10:(kind==='shrimp'?5:5);
+      if(kind==='shrimp'&&!fl.floor) continue;
+      if(Math.abs(fl.x-r.x)<rx&&Math.abs(fl.y-r.y)<ry+(kind==='shrimp'?3:0)){
+        f.hunger=Math.min(100,f.hunger+12);eaten=true;
+        r.sq=0.32;burst('crumbs',r.x+(r.dir>0?3:-3),r.y,{n:3});
+        if(showSound) sfx.eat();
+        if(f.hunger>=95&&mood(f)[1]==='good'&&Math.random()<0.55) addFx('heart',r.x,r.y-6);
+        if(Math.random()<0.5) scene.bubbles.push({x:r.x+r.dir*-4,y:r.y-2,vy:rnd(8,14),s:1});
+        break;
+      }
+    }
+    if(eaten){scene.food.splice(i,1);}
+  }
+  /* bubbles */
+  const hasBubbler=S.decor.slots.includes('bubbler');
+  if(hasBubbler&&Math.random()<dt*9){const i=S.decor.slots.indexOf('bubbler');scene.bubbles.push({x:SLOT_X[i]+rnd(-2,2),y:SAND_Y-6,vy:rnd(14,26),s:Math.random()<0.3?2:1});if(showSound&&Math.random()<0.2) sfx.bubble();}
+  if(Math.random()<dt*0.7){scene.bubbles.push({x:rnd(8,152),y:SAND_Y-2,vy:rnd(6,12),s:1});if(showSound&&Math.random()<0.3) sfx.bubble();}
+  const chest=S.decor.slots.indexOf('chest');
+  if(chest>=0&&Math.sin(scene.t*0.6)>0.92&&Math.random()<dt*10) scene.bubbles.push({x:SLOT_X[chest]+rnd(-3,3),y:SAND_Y-12,vy:rnd(14,24),s:1});
+  for(let i=scene.bubbles.length-1;i>=0;i--){const b=scene.bubbles[i];b.y-=b.vy*dt;b.x+=Math.sin(scene.t*3+b.y*0.2)*0.15;if(b.y<2) scene.bubbles.splice(i,1);}
+  if(scene.bubbles.length>60) scene.bubbles.splice(0,scene.bubbles.length-60);
+  for(let i=scene.fx.length-1;i>=0;i--){const e=scene.fx[i];e.t+=dt;if(e.t>1.4) scene.fx.splice(i,1);}
+  for(let i=scene.shells.length-1;i>=0;i--){const e=scene.shells[i];e.t-=dt;if(e.t<=0) scene.shells.splice(i,1);}
+  updateJuice(dt);
+}
+
+const HEART=['.#.#.','#####','.###.','..#..'];
+const ZZ=['###','.#.','###'];
+function drawGlyph(c,rows,x,y,col){
+  c.fillStyle=col;
+  rows.forEach((r,j)=>{for(let i=0;i<r.length;i++) if(r[i]==='#') c.fillRect(Math.round(x)+i,Math.round(y)+j,1,1);});
+}
+function drawSpr(c,s,r,x,y,flipX,flipY,sx,frame,extra,sy,wig){
+  c.save();
+  const cx=Math.round(x+s.w/2),cy=Math.round(y+s.h/2);
+  c.translate(cx,cy);
+  c.scale((flipX?-1:1)*(sx||1),(flipY?-1:1)*(sy||1));
+  const ox=-Math.round(s.w/2),oy=-Math.round(s.h/2);
+  if(wig>0.02&&!REDUCED){
+    /* tail ripple: slide each pixel column up/down, more toward the tail (head is on the left) */
+    const W=frame.width,H=frame.height,ph=r.wag||0;
+    for(let ix=0;ix<W;ix++){
+      const u=ix/W,dy=Math.round(Math.sin(ph-ix*0.42)*wig*u*u*1.7);
+      c.drawImage(frame,ix,0,1,H,ox+ix,oy+dy,1,H);
+    }
+  }else c.drawImage(frame,ox,oy);
+  if(extra){c.translate(ox,oy);extra(c);}
+  c.restore();
+}
+function drawScene(){
+  const c=scene.c,t=scene.t,th=THEMES.find(x=>x.id===S.theme)||THEMES[0];
+  if(scene.bgTheme!==th.id){scene.bg=buildBg(th);scene.bgTheme=th.id;}
+  const light=dayLight(),night=1-light;
+  c.globalCompositeOperation='source-over';
+  c.drawImage(scene.bg,0,0);
+  c.fillStyle='rgba(255,255,255,'+(0.05+0.05*light).toFixed(3)+')';
+  for(let i=0;i<4;i++){
+    const bx=((i*46+t*2.2)%200)-24;
+    c.beginPath();c.moveTo(bx,0);c.lineTo(bx+14,0);c.lineTo(bx+4,SAND_Y);c.lineTo(bx-20,SAND_Y);c.closePath();c.fill();
+  }
+  drawAmbientBack(c,t,light);
+  /* decor behind creatures */
+  S.decor.slots.forEach((id,i)=>{if(id&&DRAW[id]&&!DECOR[id].plant) DRAW[id](c,SLOT_X[i],SAND_Y+2,t);});
+  /* molted shells */
+  for(const e of scene.shells){
+    const f=S.fish.find(x=>x.id===e.id);if(!f) continue;
+    const s=getSprite(f,stageOf(f),false);
+    c.globalAlpha=Math.min(0.45,e.t/40*0.45);
+    c.save();c.translate(Math.round(e.x),Math.round(SAND_Y+3-s.feet+s.h*0.5+s.h/2-s.h*0.5));c.scale(1,1);c.drawImage(s.cv,-Math.round(s.w/2),-Math.round(s.h/2));c.restore();
+    c.globalAlpha=1;
+  }
+  /* polyps */
+  S.polyps.forEach((p,j)=>drawPolyp(c,p,18+j*26,SAND_Y+12,t));
+  /* coin pile */
+  const coins=Math.min(14,Math.floor(S.pile));
+  if(coins>0){
+    const rows=[5,4,3,2],px=147,py=SAND_Y+14;let n=0;
+    for(let ri2=0;ri2<rows.length&&n<coins;ri2++){
+      for(let k=0;k<rows[ri2]&&n<coins;k++,n++){
+        const cx=px-rows[ri2]*2+k*4+1,cy=py-ri2*3;
+        R(c,'#b8860b',cx,cy+1,4,2);R(c,'#f4c542',cx,cy,4,2);R(c,'#fff1a8',cx+1,cy,2,1);
+      }
+    }
+    if(Math.sin(t*5)>0.8) R(c,'#fff',px+Math.round(Math.sin(t*9)*6),py-8,1,1);
+  }
+  /* creatures */
+  const order=[...S.fish].sort((a,b)=>{
+    const fa=SP[a.sp].dep,fb=SP[b.sp].dep;return fb-fa;
+  });
+  const carriers=new Set(S.eggs.filter(e=>e.carrier).map(e=>e.carrier));
+  for(const f of order){
+    const r=scene.rt.get(f.id);if(!r) continue;
+    const s=getSprite(f,stageOf(f),f.sick),sp=SP[f.sp];
+    const bob=sp.floor?0:(s.jelly?0:Math.sin(r.phase)*0.6);
+    const shim=r.shim>0?Math.round(Math.sin(r.shim*45)*1.6):0;
+    const x=Math.round(r.x-s.w/2)+shim,y=Math.round(r.y-s.h/2+bob);
+    if(s.glow){
+      const cx=x+s.w/2,cy=y+s.h/2,rad=Math.max(s.w,s.h)*(0.95+0.1*Math.sin(t*2+r.phase));
+      const gc=s.glowRGB.join(',');
+      const gr=c.createRadialGradient(cx,cy,1,cx,cy,rad);
+      gr.addColorStop(0,'rgba('+gc+','+(0.35+0.35*night)+')');gr.addColorStop(1,'rgba('+gc+',0)');
+      c.globalCompositeOperation='lighter';c.fillStyle=gr;c.fillRect(cx-rad,cy-rad,rad*2,rad*2);c.globalCompositeOperation='source-over';
+    }
+    const frame=s.jelly?s.frames[Math.floor(r.pp*4)%4]:s.cv;
+    let sx=r.turn>0?(0.2+0.8*(1-r.turn/0.2)):1,sy=1;
+    if(r.sq>0&&!REDUCED){
+      /* squash then stretch, springing back */
+      const u=Math.min(1,r.sq/0.4),q=u*Math.cos((1-u)*Math.PI*2.4);
+      sx*=1+0.24*q;sy=1-0.2*q;
+    }
+    const wig=SP[f.sp].kind==='fish'?(r.sleep?0.15:(f.sick?0.25:0.45+Math.min(1,(r.mv||0)/14)*0.9)):0;
+    const flipX=r.dir>0,flipY=false;
+    const berried=carriers.has(f.id)&&s.eggPos;
+    drawSpr(c,s,r,x,y,flipX,flipY,sx,frame,berried?(cc=>{
+      for(let k=0;k<4;k++){cc.fillStyle=k%2?'#8fd36a':'#c6e86a';cc.fillRect(s.eggPos.x-k,s.eggPos.y+(k%2),1,1);}
+    }):null,sy,wig);
+    if(s.pearl&&Math.sin(t*3+r.phase*2)>0.94){const px=x+Math.round(s.w*0.45),py=y+Math.round(s.h*0.4);R(c,'#fff',px,py,1,1);R(c,'#fff',px-1,py,3,1);R(c,'#fff',px,py-1,1,3);}
+    if(f.sick){R(c,'#7ee08a',x+s.w/2-1,y-6,3,1);R(c,'#7ee08a',x+s.w/2,y-7,1,3);}
+    else if(f.hunger<30){R(c,'#ffd166',x+s.w/2,y-7,1,3);R(c,'#ffd166',x+s.w/2,y-3,1,1);}
+  }
+  /* plants in front so small creatures can hide behind them */
+  S.decor.slots.forEach((id,i)=>{if(id&&DRAW[id]&&DECOR[id].plant) DRAW[id](c,SLOT_X[i],SAND_Y+2,t);});
+  for(const fl of scene.food) R(c,fl.floor?'#c98a3a':'#e8a04a',fl.x,fl.y,2,2);
+  for(const b of scene.bubbles){c.fillStyle='rgba(255,255,255,.55)';c.fillRect(Math.round(b.x),Math.round(b.y),b.s,b.s);if(b.s>1){c.fillStyle='rgba(255,255,255,.9)';c.fillRect(Math.round(b.x),Math.round(b.y),1,1);}}
+  for(const e of scene.fx){
+    const a=Math.max(0,1-e.t/1.4);
+    c.globalAlpha=a;
+    if(e.type==='heart') drawGlyph(c,HEART,e.x-2,e.y-e.t*9,'#ff6b8b');
+    else if(e.type==='z') drawGlyph(c,ZZ,e.x,e.y-e.t*6,'#e8f4ff');
+    else {c.fillStyle='#fff';c.fillRect(Math.round(e.x+Math.sin(e.t*9)*3),Math.round(e.y-e.t*8),1,1);}
+    c.globalAlpha=1;
+  }
+  drawRipples(c);
+  drawMurk(c);
+  drawAlgae(c);
+  drawSwirl(c);
+  if(night>0.02){c.fillStyle='rgba(8,18,60,'+(night*0.2).toFixed(3)+')';c.fillRect(0,0,SW,SH);}
+  drawWipe(c);
+  drawParts(c);
+  if(scene.decorMode){
+    SLOT_X.forEach((x,i)=>{
+      const a=0.55+0.35*Math.sin(t*4+i);
+      c.fillStyle='rgba(255,179,71,'+a.toFixed(2)+')';
+      c.fillRect(x-8,SAND_Y+6,16,1);c.fillRect(x-8,SAND_Y+14,16,1);c.fillRect(x-8,SAND_Y+6,1,9);c.fillRect(x+7,SAND_Y+6,1,9);
+      if(!S.decor.slots[i]){c.fillRect(x-3,SAND_Y+10,7,1);c.fillRect(x,SAND_Y+7,1,7);}
+    });
+  }
+}
+function sceneLoop(ts){
+  if(!scene.running) return;
+  const dt=Math.min(0.1,(ts-scene.last)/1000||0.016);
+  scene.last=ts;scene.t+=dt;
+  if(S){updateScene(dt);drawScene();}
+  requestAnimationFrame(sceneLoop);
+}
+function sceneStart(){
+  if(scene.running) return;
+  scene.running=true;scene.last=performance.now();requestAnimationFrame(sceneLoop);
+}
+function sceneStop(){scene.running=false;}
+function onScenePointer(e){
+  const r=scene.cv.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width*SW,y=(e.clientY-r.top)/r.height*SH;
+  if(scene.decorMode){
+    if(y>SAND_Y-26){
+      let bi=0,bd=1e9;SLOT_X.forEach((sx,i)=>{const d=Math.abs(sx-x);if(d<bd){bd=d;bi=i;}});
+      openSheet('decor',bi);return;
+    }
+  }
+  if(S.pile>=1&&x>128&&y>SAND_Y-6){doCollect();return;}
+  if(y>SAND_Y+2){
+    for(let j=0;j<S.polyps.length;j++){
+      if(Math.abs(x-(18+j*26))<13){audioResume();sfx.tap();openSheet('polyp',S.polyps[j].id);return;}
+    }
+  }
+  let hit=null,bd=1e9;
+  for(const f of S.fish){
+    const rt=scene.rt.get(f.id);if(!rt) continue;
+    const s=getSprite(f,stageOf(f),f.sick);
+    const dx=Math.abs(x-rt.x),dy=Math.abs(y-rt.y);
+    if(dx<=s.w/2+5&&dy<=s.h/2+5){const d=dx+dy;if(d<bd){bd=d;hit=f;}}
+  }
+  if(hit){
+    audioResume();sfx.fish();
+    const rt=scene.rt.get(hit.id);
+    if(rt){
+      rt.shim=0.7;rt.sq=0.4;
+      ripple(rt.x,rt.y,9);
+      if(hit.trait==='shy'){rt.flee=1.4;}
+      else if(hit.trait==='lazy'){addFx('z',rt.x,rt.y-8);}
+      else addFx('heart',rt.x,rt.y-6);
+    }
+    openSheet('fish',hit.id);
+  }else waterTap(x,y);
+}
+/* ================= species spec (hybrids blend body size from both parents) ================= */
+function spriteSpec(f){
+  const A=SP[f.sp],B=f.hyb&&SP[f.hyb];
+  if(!B||B.kind!==A.kind) return A;
+  return Object.assign({},A,{
+    len:Math.round((A.len+B.len)/2),hei:Math.round((A.hei+B.hei)/2),
+    tailMul:((A.tailMul||1)+(B.tailMul||1))/2,finMul:((A.finMul||1)+(B.finMul||1))/2
+  });
+}
+
+/* ================= jellyfish sprites: one shape per real-life kind, 4 pulse frames each ================= */
+const put=(g,x,y,hex,a)=>{
+  x=Math.round(x);y=Math.round(y);
+  if(y>=0&&y<g.length&&x>=0&&x<g[0].length) g[y][x]=rgba(hex,a==null?1:a);
+};
+function hsl2hex(h,s,l){
+  h=((h%360)+360)%360;s/=100;l/=100;
+  const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l);
+  const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+  return rgbHex([f(0)*255,f(8)*255,f(4)*255]);
+}
+function jctx(f,stage,sick){
+  const sp=spriteSpec(f),ph=phenotype(f);
+  const sm=(0.88+0.12*ph.size)*1.25,stm=[0.45,0.75,1][stage];
+  return {sp,ph,sick,
+    tc:c=>sick?mixHex(c,'#7d8a70',0.5):c,
+    base:COLORS[ph.color].c,acc:COLORS[ph.accent].c,
+    BW:Math.max(5,Math.round(sp.len*sm*stm)),BH:Math.max(4,Math.round(sp.hei*sm*stm))};
+}
+/* bell pattern genes: same eight patterns on every shape */
+function jPat(pat,x,y,cx,y0,bh,c,hs){
+  const vv=(y-y0)/Math.max(bh,1);
+  switch(pat){
+    case 1: return ((x-Math.floor(cx))%3===0)&&vv>0.2;
+    case 2: return (hs%8===0)&&vv>0.15&&vv<0.85;
+    case 3: {const d=Math.hypot(x+0.5-cx,(y-(y0+bh))*0.9);return (Math.floor(d)%4===0)&&d>2;}
+    case 4: {const d=Math.hypot(x+0.5-cx,(y-(y0+bh*0.62))*1.4);return (d>1.5&&d<3.6)&&((x+0.5-cx)!==0);}
+    case 5: return vv<0.3;
+    case 6: return hs%4===0;
+    case 7: return ((x+y+Math.floor(c*3))%4<1)&&vv>0.15;
+  }
+  return false;
+}
+function jOutline(g,cells,oc){
+  const W=g[0].length;
+  for(const key of cells){
+    const y=Math.floor(key/1000),x=key%1000;
+    if(y>0&&!cells.has((y-1)*1000+x)&&!g[y-1][x]) g[y-1][x]=oc;
+    if(x>0&&!cells.has(y*1000+x-1)&&!g[y][x-1]) g[y][x-1]=oc;
+    if(x<W-1&&!cells.has(y*1000+x+1)&&!g[y][x+1]) g[y][x+1]=oc;
+  }
+}
+function jFinish(frames,X){
+  const f0=frames[0];
+  return {cv:f0,frames,w:f0.width,h:f0.height,glow:X.ph.sheen===1,pearl:X.ph.sheen===2,glowRGB:hexRgb(lighten(X.base,0.3)),jelly:true,feet:f0.height-2};
+}
+const TWO_PI=Math.PI*2;
+
+/* Moon jelly: flat saucer, four glowing rings, short fringe */
+function jbSaucer(f,stage,sick){
+  const X=jctx(f,stage,sick),{ph,tc,base,acc,BW,BH}=X;
+  const tt=ph.tail,at=ph.fin;
+  const FR=Math.max(2,Math.round(BH*[0.35,0.6,0.45,0.5,0.9][tt]));
+  const ARM=Math.max(3,Math.round(BH*[0.55,0.7,0.9,1.1][at]));
+  const W=Math.round(BW*1.25)+6,Hc=Math.round(BH*1.15)+Math.max(FR,ARM)+8;
+  const frames=[];
+  for(let i=0;i<4;i++){
+    const p=i/4,c=0.5-0.5*Math.cos(p*TWO_PI);
+    const bw=BW*(1.06-0.16*c),bh=BH*(0.9+0.2*c);
+    const g=emptyGrid(W,Hc),cx=W/2,y0=2,cells=new Set(),rim=new Map();
+    for(let x=0;x<W;x++){
+      const u=(x+0.5-cx)/(bw/2);
+      if(Math.abs(u)>1) continue;
+      const h=bh*Math.pow(1-u*u,0.55);
+      const yTop=y0+bh-h,yBot=y0+bh-u*u*bh*0.2;
+      rim.set(x,yBot);
+      for(let y=Math.floor(yTop);y<=Math.floor(yBot);y++){
+        const vv=(y-y0)/Math.max(bh,1),hs=hash2(x,y);
+        let col=vv<0.3?lighten(base,0.5):(vv>0.8?mixHex(base,acc,0.5):base);
+        let a=vv<0.3?0.9:(vv>0.8?0.9:0.7);
+        if(jPat(ph.pattern,x,y,cx,y0,bh,c,hs)){col=acc;a=0.9;}
+        if(ph.sheen===2&&vv<0.35) col=mixHex(col,'#ffffff',0.6);
+        put(g,x,y,tc(col),a);cells.add(y*1000+x);
+      }
+    }
+    if(BW>=11){
+      const ry=Math.round(y0+bh*0.5),rc=tc(mixHex(acc,'#ffffff',0.3));
+      const ring=rx=>[[1,0],[2,0],[0,1],[3,1],[1,2],[2,2]].forEach(([dx,dy])=>put(g,rx+dx,ry+dy,rc,0.95));
+      ring(Math.round(cx-bw*0.2-2));ring(Math.round(cx+bw*0.2-2));
+    }
+    const fcol=tc(acc);
+    for(const [x,yb0] of rim){
+      if(x%2) continue;
+      const yb=Math.floor(yb0),len=FR*(0.7+0.3*((hash2(x,7)%100)/100));
+      for(let j=1;j<=len;j++){
+        const off=Math.sin(p*TWO_PI+j*0.7+x*0.5)*(tt===3?1.3:0.5);
+        put(g,x+off,yb+j,fcol,j>len*0.7?0.35:0.6);
+      }
+    }
+    const acol=tc(mixHex(acc,'#ffffff',0.35));
+    for(let k=0;k<4;k++){
+      const ax=cx+(k-1.5)*bw*0.11;
+      for(let j=0;j<=ARM;j++){
+        const off=Math.sin(p*TWO_PI+j*0.8+k*1.7)*(0.5+at*0.35)+((at>=2&&j%2)?0.6:-0.2);
+        put(g,ax+off,y0+bh*0.92+j,acol,0.85);
+        if(at>=2) put(g,ax+off+1,y0+bh*0.92+j,acol,0.55);
+      }
+    }
+    jOutline(g,cells,rgba(tc(darken(base,0.5)),0.9));
+    frames.push(gridToCanvas(g,W,Hc));
+  }
+  return jFinish(frames,X);
+}
+
+/* Sea nettle: tall scalloped bell with stripes, thick ruffled arms, very long streamers */
+function jbNettle(f,stage,sick){
+  const X=jctx(f,stage,sick),{ph,tc,base,acc,BW,BH}=X;
+  const tt=ph.tail,at=ph.fin;
+  const TL=Math.round(BH*[1.5,1.9,1.7,1.8,2.4][tt]);
+  const AL=Math.max(3,Math.round(BH*[0.7,0.9,1.1,1.3][at]));
+  const W=Math.round(BW*1.4)+8,Hc=Math.round(BH*1.15)+TL+6;
+  const frames=[];
+  for(let i=0;i<4;i++){
+    const p=i/4,c=0.5-0.5*Math.cos(p*TWO_PI);
+    const bw=BW*(1.04-0.14*c),bh=BH*(0.92+0.16*c);
+    const g=emptyGrid(W,Hc),cx=W/2,y0=2,cells=new Set();
+    const lobeW=Math.max(2,Math.round(bw/5));
+    for(let x=0;x<W;x++){
+      const u=(x+0.5-cx)/(bw/2);
+      if(Math.abs(u)>1) continue;
+      const lobe=Math.floor((x+0.5-cx+bw/2)/lobeW);
+      const h=bh*Math.sqrt(1-u*u);
+      const yTop=y0+bh-h,yBot=y0+bh-((lobe%2)?1.4:0);
+      for(let y=Math.floor(yTop);y<=Math.floor(yBot);y++){
+        const vv=(y-y0)/Math.max(bh,1),hs=hash2(x,y);
+        let col=vv<0.25?lighten(base,0.45):((lobe%2)?base:mixHex(base,acc,0.5));
+        let a=vv<0.25?0.92:0.8;
+        if(jPat(ph.pattern,x,y,cx,y0,bh,c,hs)){col=lighten(acc,0.15);a=0.92;}
+        if(ph.sheen===2&&vv<0.35) col=mixHex(col,'#ffffff',0.6);
+        put(g,x,y,tc(col),a);cells.add(y*1000+x);
+      }
+    }
+    const rimY=y0+bh;
+    const acol=tc(mixHex(acc,'#ffffff',0.5));
+    for(let k=0;k<4;k++){
+      const ax=cx+(k-1.5)*bw*0.13;
+      for(let j=0;j<=AL;j++){
+        const off=Math.sin(p*TWO_PI+j*0.7+k*1.4)*1.1+((j%2)?0.7:-0.7)*(at>=1?1:0.5);
+        const y=rimY-1+j;
+        put(g,ax+off,y,acol,0.92);put(g,ax+off+1,y,acol,0.92);
+        if(j%3===0){put(g,ax+off-1,y,acol,0.6);put(g,ax+off+2,y,acol,0.6);}
+      }
+    }
+    const tcol=tc(darken(acc,0.1));
+    for(let k=0;k<8;k++){
+      const tx=cx-bw/2+(k+0.5)*bw/8;
+      const len=Math.round(TL*(0.65+0.35*((hash2(k,5)%100)/100)));
+      for(let j=1;j<=len;j++){
+        let off=Math.sin(p*TWO_PI+j*0.45+k*1.1)*1.1*(0.3+0.7*j/len)+(k-3.5)*0.16*Math.min(j,10);
+        if(tt===3&&j>len-5) off+=((k%2)?1:-1)*(j-(len-5))*0.7;
+        const y=rimY+j;
+        put(g,tx+off,y,tcol,j>len*0.8?0.35:0.65);
+        if(tt===4) put(g,tx+off+1,y,tcol,0.5);
+      }
+    }
+    jOutline(g,cells,rgba(tc(darken(base,0.5)),0.9));
+    frames.push(gridToCanvas(g,W,Hc));
+  }
+  return jFinish(frames,X);
+}
+
+/* Upside-down jelly: flat disc lying on the sand, frilly arms reaching up like a flower */
+function jbRosette(f,stage,sick){
+  const X=jctx(f,stage,sick),{ph,tc,base,acc,BW,BH}=X;
+  const tt=ph.tail,at=ph.fin;
+  const nA=[4,5,6,7,8][tt];
+  const AH=Math.max(4,Math.round(BH*[1.4,1.7,2.0,2.4][at]));
+  const DH=Math.max(3,Math.round(BH*0.55));
+  const W=BW+10,Hc=AH+DH+8;
+  const frames=[];
+  for(let i=0;i<4;i++){
+    const p=i/4,c=0.5-0.5*Math.cos(p*TWO_PI);
+    const bw=BW*(1+0.05*c);
+    const g=emptyGrid(W,Hc),cx=W/2,cells=new Set();
+    const dB=Hc-3,dT=dB-DH;
+    for(let x=0;x<W;x++){
+      const u=(x+0.5-cx)/(bw/2);
+      if(Math.abs(u)>1) continue;
+      const hh=DH*Math.pow(1-u*u,0.45);
+      for(let y=Math.floor(dB-hh);y<=dB;y++){
+        const hs=hash2(x,y),top=y<dB-hh+1.4;
+        let col=top?lighten(base,0.35):base,a=0.88;
+        if(jPat(ph.pattern,x,y,cx,dT,DH,c,hs)){col=acc;a=0.9;}
+        if(ph.sheen===2&&top) col=mixHex(col,'#ffffff',0.6);
+        put(g,x,y,tc(col),a);cells.add(y*1000+x);
+      }
+    }
+    const stalk=tc(mixHex(acc,base,0.35)),knob=tc(lighten(acc,0.2));
+    for(let k=0;k<nA;k++){
+      const t=(k+0.5)/nA,ax=cx-bw*0.34+t*bw*0.68;
+      const hk=Math.max(3,Math.round(AH*(0.65+0.35*((hash2(k,11)%100)/100))));
+      for(let j=0;j<=hk;j++){
+        const sway=Math.sin(p*TWO_PI+k*1.2)*0.9*(j/hk);
+        const x=ax+sway,y=dT+DH*0.4-j;
+        put(g,x,y,stalk,0.92);
+        if(j<hk*0.4) put(g,x+1,y,stalk,0.8);
+        if(at>=2&&j>hk*0.5&&j%2) put(g,x-1,y,knob,0.7);
+      }
+      const tx=ax+Math.sin(p*TWO_PI+k*1.2)*0.9,ty=dT+DH*0.4-hk;
+      put(g,tx-1,ty,knob,0.95);put(g,tx,ty,knob,0.95);put(g,tx+1,ty,knob,0.95);put(g,tx,ty-1,knob,0.95);
+      if(at>=1){put(g,tx-1,ty-1,knob,0.7);put(g,tx+1,ty-1,knob,0.7);}
+      if(hash2(k,i)%5===0) put(g,tx,ty-2,'#ffffff',0.8);
+    }
+    jOutline(g,cells,rgba(tc(darken(base,0.45)),0.9));
+    frames.push(gridToCanvas(g,W,Hc));
+  }
+  return jFinish(frames,X);
+}
+
+/* Comb jelly: clear oval, rainbow rows that ripple, two feathery tentacles */
+function jbComb(f,stage,sick){
+  const X=jctx(f,stage,sick),{ph,tc,base,acc,BW,BH}=X;
+  const tt=ph.tail,at=ph.fin;
+  const TL=Math.round(BH*[1.3,1.8,1.5,2,2.4][tt]);
+  const lobeL=[0,3,4,5][at];
+  const W=Math.round(BW*2.2)+8,Hc=BH+TL+lobeL+8;
+  const nR=3+(ph.pattern%4);
+  const frames=[];
+  for(let i=0;i<4;i++){
+    const p=i/4,c=0.5-0.5*Math.cos(p*TWO_PI);
+    const bw=BW*(1+0.03*c),bh=BH;
+    const g=emptyGrid(W,Hc),cx=W/2,y0=2,cells=new Set();
+    const half=y=>(bw/2)*Math.pow(Math.sin(Math.PI*Math.min(1,(y-y0+0.5)/bh)),0.75)*(1.05-0.2*((y-y0)/bh));
+    for(let y=y0;y<y0+bh;y++){
+      const hw=half(y);
+      for(let x=Math.floor(cx-hw);x<=Math.ceil(cx+hw);x++){
+        const dx=Math.abs(x+0.5-cx);
+        if(dx>hw) continue;
+        const edge=dx>hw-1,vv=(y-y0)/bh;
+        let col=vv<0.25?lighten(base,0.5):base,a=edge?0.7:0.38;
+        if(ph.sheen===2&&vv<0.35) col=mixHex(col,'#ffffff',0.6);
+        put(g,x,y,tc(col),a);cells.add(y*1000+x);
+      }
+    }
+    for(let r=0;r<nR;r++){
+      const ur=-0.72+1.44*r/Math.max(1,nR-1);
+      for(let y=y0+2;y<y0+bh-2;y++){
+        const x=cx+ur*half(y);
+        const hue=(y*24+i*90+r*40)%360;
+        const amp=0.5+0.5*Math.sin(y*0.8-i*Math.PI/2+r*0.6);
+        put(g,x,y,tc(hsl2hex(hue,95,62)),0.3+0.65*amp);
+      }
+    }
+    if(lobeL>0){
+      for(let dy=0;dy<lobeL;dy++){
+        const w=dy<lobeL-1?2:1;
+        for(const s of [-1,1]) for(let k=0;k<w;k++) put(g,cx+s*bw*0.26+(s>0?k:-k-1),y0+bh+dy,tc(lighten(base,0.3)),0.65);
+      }
+    }
+    const tcol=tc(mixHex(acc,'#ffffff',0.25));
+    for(const s of [-1,1]){
+      const sx=cx+s*bw*0.28,sy=y0+bh*0.8;
+      for(let j=1;j<=TL;j++){
+        const off=s*j*0.1+Math.sin(p*TWO_PI+j*0.5+(s>0?1:0))*1.0*(0.3+0.7*j/TL);
+        const x=sx+off,y=sy+j;
+        put(g,x,y,tcol,j>TL*0.8?0.35:0.75);
+        if(j%3===0){put(g,x+1,y,tcol,0.5);put(g,x-1,y+1,tcol,0.4);}
+      }
+    }
+    jOutline(g,cells,rgba(tc(lighten(base,0.2)),0.6));
+    frames.push(gridToCanvas(g,W,Hc));
+  }
+  return jFinish(frames,X);
+}
+
+/* Immortal jelly: tiny thimble with a bright red middle and a fuzzy ring of tentacles */
+function jbTiny(f,stage,sick){
+  const X=jctx(f,stage,sick),{ph,tc,base,acc,BW,BH}=X;
+  const tt=ph.tail,at=ph.fin;
+  const TL=Math.max(2,Math.round(BH*[0.5,0.75,0.6,0.7,1.0][tt]));
+  const AL=[0,2,3,4][at];
+  const W=Math.round(BW*1.5)+6,Hc=BH+TL+AL+8;
+  const frames=[];
+  for(let i=0;i<4;i++){
+    const p=i/4,c=0.5-0.5*Math.cos(p*TWO_PI);
+    const bw=BW*(1.04-0.18*c),bh=BH*(0.92+0.16*c);
+    const g=emptyGrid(W,Hc),cx=W/2,y0=2,cells=new Set(),rim=[];
+    for(let x=0;x<W;x++){
+      const u=(x+0.5-cx)/(bw/2);
+      if(Math.abs(u)>1) continue;
+      const h=bh*Math.pow(1-u*u,0.4),yTop=y0+bh-h,yBot=y0+bh;
+      rim.push(x);
+      for(let y=Math.floor(yTop);y<=Math.floor(yBot);y++){
+        const vv=(y-y0)/Math.max(bh,1),hs=hash2(x,y);
+        let col=vv<0.3?lighten(base,0.6):base,a=vv<0.3?0.8:0.5;
+        if(jPat(ph.pattern,x,y,cx,y0,bh,c,hs)){col=acc;a=0.8;}
+        if(ph.sheen===2&&vv<0.35) col=mixHex(col,'#ffffff',0.6);
+        put(g,x,y,tc(col),a);cells.add(y*1000+x);
+      }
+    }
+    const sw=bw>=9?1:0;
+    for(let y=Math.round(y0+bh*0.35);y<=Math.round(y0+bh*0.9);y++){
+      const lowrow=y>y0+bh*0.7;
+      for(let x=Math.round(cx)-1-sw;x<=Math.round(cx)+sw;x++) put(g,x,y,tc(lowrow?darken(acc,0.2):acc),0.98);
+    }
+    const tcol=tc(lighten(acc,0.3));
+    for(const x of rim){
+      const len=Math.max(1,Math.round(TL*(0.6+0.4*((hash2(x,3)%100)/100))));
+      for(let j=1;j<=len;j++) put(g,x+Math.sin(p*TWO_PI+j*0.8+x)*0.6,y0+bh+j,tcol,0.6);
+    }
+    for(let j=1;j<=AL;j++) put(g,cx+Math.sin(p*TWO_PI+j)*0.5,y0+bh+j,tc(acc),0.9);
+    if(i===1) put(g,cx+bw*0.3,y0+1,'#ffffff',0.95);
+    jOutline(g,cells,rgba(tc(darken(base,0.4)),0.85));
+    frames.push(gridToCanvas(g,W,Hc));
+  }
+  return jFinish(frames,X);
+}
+
+/* Box jelly: cube-shaped bell with eyes on the sides and a bundle of tentacles at each corner */
+function jbBox(f,stage,sick){
+  const X=jctx(f,stage,sick),{ph,tc,base,acc,BW,BH}=X;
+  const tt=ph.tail;
+  const TL=Math.round(BH*[1.2,2.0,1.6,1.8,2.5][tt]);
+  const W=BW+14,Hc=Math.round(BH*1.15)+TL+6;
+  const frames=[];
+  for(let i=0;i<4;i++){
+    const p=i/4,c=0.5-0.5*Math.cos(p*TWO_PI);
+    const bw=BW*(1.04-0.12*c),bh=BH*(0.94+0.1*c);
+    const g=emptyGrid(W,Hc),cx=W/2,y0=2,cells=new Set();
+    for(let y=y0;y<y0+bh;y++){
+      const r=y-y0;
+      const hw=bw/2-(r<2?(2-r)*0.9:0)-(r>bh-2?0.5:0);
+      for(let x=Math.floor(cx-hw);x<Math.ceil(cx+hw);x++){
+        const dx=Math.abs(x+0.5-cx);
+        if(dx>hw) continue;
+        const vv=r/Math.max(bh,1),hs=hash2(x,y);
+        let col=vv<0.2?lighten(base,0.5):base,a=dx>hw-1.2?0.82:0.55;
+        if(dx>hw-1.2) col=darken(base,0.15);
+        if(jPat(ph.pattern,x,y,cx,y0,bh,c,hs)){col=acc;a=0.9;}
+        if(ph.sheen===2&&vv<0.35) col=mixHex(col,'#ffffff',0.6);
+        put(g,x,y,tc(col),a);cells.add(y*1000+x);
+      }
+    }
+    const sy=Math.round(y0+bh*0.8);
+    for(let x=Math.round(cx-bw/2+2);x<Math.round(cx+bw/2-2);x++) put(g,x,sy,tc(mixHex(acc,base,0.5)),0.85);
+    const ey=Math.round(y0+bh*0.5);
+    for(const ex of [cx-bw/2+1.5,cx+bw/2-1.5]){put(g,ex,ey,'#1b2a44',0.95);put(g,ex,ey-1,'#cfe9ff',0.8);}
+    const tcol=tc(acc);
+    const bundles=[[cx-bw/2+1,1],[cx+bw/2-2,1],[cx-bw*0.18,0.6],[cx+bw*0.18,0.6]];
+    bundles.forEach(([bx,m],k)=>{
+      const len=Math.round(TL*m*(0.85+0.15*((hash2(k,2)%100)/100)));
+      const by=y0+bh;
+      for(let j=0;j<=len;j++){
+        const off=Math.sin(p*TWO_PI+j*0.5+k)*0.8*(j/Math.max(1,len));
+        const a=j>len*0.8?0.4:0.8;
+        put(g,bx+off,by+j,tcol,a);
+        if(m===1&&j<len*0.8) put(g,bx+off+1,by+j,tcol,a*0.7);
+      }
+    });
+    jOutline(g,cells,rgba(tc(darken(base,0.5)),0.9));
+    frames.push(gridToCanvas(g,W,Hc));
+  }
+  return jFinish(frames,X);
+}
+
+const JB={saucer:jbSaucer,nettle:jbNettle,rosette:jbRosette,comb:jbComb,tiny:jbTiny,box:jbBox};
+function buildJelly(f,stage,sick){
+  const fn=JB[spriteSpec(f).jshape]||jbSaucer;
+  return fn(f,stage,sick);
+}
+/* ================= juice: particles, ripples, polish ================= */
+const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+Object.assign(scene,{parts:[],ripples:[],snow:[],vw:null,va:null,wipe:null,swirl:null,rinse:null,pileN:null});
+const CONFETTI=['#ff6b8b','#ffd166','#7ee08a','#6fd3ff','#c79bff','#ffffff'];
+const jrnd=(a,b)=>a+Math.random()*(b-a);
+
+function addPart(p){
+  if(scene.parts.length>220) scene.parts.shift();
+  p.t=0;p.life=p.life||0.8;scene.parts.push(p);
+}
+function burst(kind,x,y,o){
+  if(REDUCED) return;
+  o=o||{};
+  const n=o.n;
+  if(kind==='confetti'){
+    for(let i=0,m=n||22;i<m;i++) addPart({x:x+jrnd(-3,3),y:y+jrnd(-3,3),vx:jrnd(-48,48),vy:jrnd(-80,-26),g:95,life:jrnd(0.9,1.7),col:CONFETTI[i%CONFETTI.length],sz:Math.random()<0.4?2:1,sw:jrnd(0,6.28)});
+  }else if(kind==='sparkle'){
+    const cols=o.cols||['#fff6b0','#ffffff','#ffe27a'];
+    for(let i=0,m=n||8;i<m;i++){
+      const a=Math.random()*6.283,sp=jrnd(8,26);
+      addPart({x:x+Math.cos(a)*3,y:y+Math.sin(a)*3,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-6,g:0,drag:2.2,life:jrnd(0.55,1.1),col:cols[i%cols.length],shape:'plus'});
+    }
+  }else if(kind==='heal'){
+    for(let i=0,m=n||10;i<m;i++) addPart({x:x+jrnd(-8,8),y:y+jrnd(-2,6),vx:jrnd(-4,4),vy:jrnd(-26,-12),g:-4,life:jrnd(0.9,1.5),col:i%2?'#7ee08a':'#c9ffd0',shape:'plus'});
+  }else if(kind==='plunge'){
+    for(let i=0,m=n||2;i<m;i++) addPart({x:x+jrnd(-1,1),y:y,vx:jrnd(-4,4),vy:jrnd(8,22),g:-26,life:jrnd(0.4,0.8),col:'#e6f6ff'});
+  }else if(kind==='crumbs'){
+    for(let i=0,m=n||3;i<m;i++) addPart({x,y,vx:jrnd(-12,12),vy:jrnd(-10,4),g:14,life:jrnd(0.35,0.7),col:i%2?'#e8a04a':'#c98a3a'});
+  }else if(kind==='sand'){
+    const th=THEMES.find(q=>q.id===S.theme)||THEMES[0],col=lighten(th.sand,0.15);
+    for(let i=0,m=n||4;i<m;i++) addPart({x:x+jrnd(-2,2),y,vx:jrnd(-16,16),vy:jrnd(-18,-5),g:55,life:jrnd(0.3,0.55),col});
+  }else if(kind==='foam'){
+    for(let i=0,m=n||2;i<m;i++) addPart({x:x+jrnd(-3,3),y:y+jrnd(-5,5),vx:jrnd(-8,8),vy:jrnd(-10,2),g:-3,life:jrnd(0.4,0.85),col:i%3?'#f2fbff':'#bfe9ff'});
+  }
+}
+function ripple(x,y,max,o){
+  if(REDUCED) return;
+  o=o||{};
+  if(scene.ripples.length>14) scene.ripples.shift();
+  scene.ripples.push({x,y,t:0,dur:o.dur||0.9,max:max||12,ry:o.ry||0.45,col:o.col||'255,255,255'});
+}
+function initSnow(){
+  scene.snow=[];
+  for(let i=0;i<30;i++) scene.snow.push({x:jrnd(0,SW),y:jrnd(0,SAND_Y),vy:jrnd(1.5,4.5),ph:jrnd(0,6.28),a:jrnd(0.18,0.45)});
+}
+
+/* ----- one-shot effects the UI triggers ----- */
+function scrubFx(){
+  scene.wipe={t:0,dur:0.9,x:-8,y:20,from:(scene.va==null?S.algae:scene.va)};
+}
+function swirlFx(){
+  scene.swirl={t:0,dur:1.5};
+  for(let i=0;i<3;i++) ripple(jrnd(30,130),2,jrnd(12,20),{ry:0.25,dur:jrnd(0.7,1.1)});
+}
+function rinseFx(){scene.rinse={t:0,dur:0.95};}
+function healFx(id){
+  const r=scene.rt.get(id);if(!r) return;
+  burst('heal',r.x,r.y,{n:12});ripple(r.x,r.y,10,{col:'126,224,138'});r.sq=0.4;
+}
+function waterTap(x,y){
+  audioResume();
+  if(y>SAND_Y+1){burst('sand',x,y,{n:5});}
+  else ripple(x,y,15,{ry:0.5});
+  sfx.tink();
+  for(const f of S.fish){
+    const r=scene.rt.get(f.id);if(!r||r.sleep||f.sick) continue;
+    const kind=kindOf(f);
+    if(kind==='shrimp'||(kind==='jelly'&&!SP[f.sp].glide)) continue;
+    const d=Math.hypot(r.x-x,r.y-y);
+    if(f.trait==='shy'){
+      if(d<48){r.flee=0.9;r.wait=0;r.tx=clamp(r.x+(r.x-x)*3,8,152);r.ty=clamp(r.y+(r.y-y)*3,12,SAND_Y-10);}
+    }else if(d<95&&(f.trait==='bold'||f.trait==='greedy'||f.trait==='social'||f.trait==='playful'||Math.random()<0.3)){
+      r.tx=x;r.ty=clamp(y,10,SAND_Y-8);r.wait=0;r.chase=0;
+    }
+  }
+}
+
+/* ----- celebration events queued by the sim ----- */
+let jfxAt=0;
+function jsfx(name){
+  const n=performance.now();
+  if(n-jfxAt<160) return;
+  jfxAt=n;if(sfx[name]) sfx[name]();
+}
+function fireJuice(e,r){
+  const x=r.x,y=r.y;
+  switch(e.kind){
+    case 'hatch': burst('confetti',x,y,{n:12});burst('sparkle',x,y,{n:5});ripple(x,y,10);break;
+    case 'grow': burst('sparkle',x,y,{n:10});ripple(x,y,13);r.sq=0.45;jsfx('levelup');break;
+    case 'species': case 'hyb': case 'rare':
+      burst('confetti',x,y,{n:34});burst('sparkle',x,y,{n:12});ripple(x,y,20);ripple(x,y,11,{dur:0.65});r.sq=0.45;jsfx('discover');break;
+    case 'gene': burst('sparkle',x,y,{n:9});ripple(x,y,12);jsfx('sparkle');break;
+    case 'arrive': burst('sparkle',x,y,{n:10});burst('plunge',x,y-6,{n:4});ripple(x,y,16);r.sq=0.45;break;
+    case 'heal': burst('heal',x,y,{n:12});ripple(x,y,10,{col:'126,224,138'});r.sq=0.4;break;
+    case 'love': for(let i=0;i<3;i++) addFx('heart',x+jrnd(-6,6),y-4-i*3);break;
+  }
+}
+function handleJuice(){
+  const now=performance.now();
+  for(let i=JUICE_Q.length-1;i>=0;i--){
+    const e=JUICE_Q[i];
+    if(!e.fxDone){
+      const r=e.id!=null?scene.rt.get(e.id):null;
+      if(r){fireJuice(e,r);e.fxDone=true;}
+      else if(e.id==null||now-e.t0>3000) e.fxDone=true;
+    }
+    if(e.fxDone&&(e.uiDone||!e.msg||now-e.t0>6000)) JUICE_Q.splice(i,1);
+  }
+}
+
+/* ----- per-frame update ----- */
+function updateJuice(dt){
+  if(!S) return;
+  /* particles */
+  for(let i=scene.parts.length-1;i>=0;i--){
+    const p=scene.parts[i];
+    p.t+=dt;
+    if(p.t>=p.life){scene.parts.splice(i,1);continue;}
+    if(p.g) p.vy+=p.g*dt;
+    if(p.drag){const k=Math.max(0,1-p.drag*dt);p.vx*=k;p.vy*=k;}
+    p.x+=p.vx*dt+(p.sw!=null?Math.sin(p.t*11+p.sw)*0.35:0);p.y+=p.vy*dt;
+  }
+  for(let i=scene.ripples.length-1;i>=0;i--){const e=scene.ripples[i];e.t+=dt;if(e.t>=e.dur) scene.ripples.splice(i,1);}
+  /* marine snow */
+  if(!scene.snow.length) initSnow();
+  for(const s of scene.snow){
+    s.y+=s.vy*dt;s.x+=Math.sin(scene.t*0.8+s.ph)*4*dt;
+    if(s.y>SAND_Y-1){s.y=0;s.x=jrnd(0,SW);}
+    if(s.x<0) s.x+=SW;else if(s.x>=SW) s.x-=SW;
+  }
+  /* eased murk + algae so cleaning fades instead of snapping */
+  const ease=(cur,tgt,up,dn)=>{
+    if(Math.abs(tgt-cur)<0.08) return tgt;
+    return cur+(tgt-cur)*(1-Math.exp(-(tgt>cur?up:dn)*dt));
+  };
+  if(scene.vw==null||REDUCED){scene.vw=S.waste;}else scene.vw=ease(scene.vw,S.waste,2,2.4);
+  if(scene.va==null||REDUCED){scene.va=S.algae;}else if(!scene.wipe) scene.va=ease(scene.va,S.algae,3,4);
+  /* scrub wipe */
+  const w=scene.wipe;
+  if(w){
+    w.t+=dt;
+    const k=Math.min(1,w.t/w.dur),e=k*k*(3-2*k);
+    w.x=-8+(SW+16)*e;
+    w.y=14+(SAND_Y-32)*(0.5+0.5*Math.sin(w.t*13));
+    scene.va=w.from;
+    if(!REDUCED){
+      if(Math.random()<dt*70) burst('foam',w.x,w.y,{n:1});
+      if(Math.random()<dt*34) addPart({x:jrnd(0,Math.max(1,w.x)),y:jrnd(8,SAND_Y-6),vx:0,vy:0,life:0.5,col:'#ffffff',shape:'plus'});
+    }
+    if(k>=1){scene.wipe=null;scene.va=S.algae;}
+  }
+  /* water change swirl */
+  const sw=scene.swirl;
+  if(sw){
+    sw.t+=dt;
+    if(sw.t<0.55&&!REDUCED&&Math.random()<dt*50) burst('plunge',jrnd(30,130),2,{n:1});
+    if(sw.t>=sw.dur) scene.swirl=null;
+  }
+  /* filter rinse */
+  const rn=scene.rinse;
+  if(rn){
+    rn.t+=dt;
+    if(rn.t>=rn.dur) scene.rinse=null;
+    else if(!REDUCED){
+      if(Math.random()<dt*45) scene.bubbles.push({x:jrnd(142,154),y:jrnd(SAND_Y-26,SAND_Y-3),vy:jrnd(22,40),s:Math.random()<0.35?2:1});
+      if(rn.t<0.6&&Math.random()<dt*34) addPart({x:jrnd(142,154),y:jrnd(SAND_Y-26,SAND_Y-4),vx:jrnd(-10,-2),vy:jrnd(4,12),g:0,life:jrnd(0.5,0.9),col:'#8a7a45'});
+    }
+  }
+  /* a new coin lands on the pile */
+  const pn=Math.min(14,Math.floor(S.pile));
+  if(scene.pileN==null) scene.pileN=pn;
+  if(pn>scene.pileN) burst('sparkle',147,SAND_Y+8,{n:3,cols:['#fff1a8','#ffffff']});
+  scene.pileN=pn;
+  handleJuice();
+}
+
+/* ----- drawing helpers ----- */
+function drawAmbientBack(c,t,light){
+  /* surface glimmer */
+  if(!REDUCED){
+    for(let x=0;x<SW;x+=3){
+      const a=0.05+0.1*Math.max(0,Math.sin(t*1.6+x*0.28))*(0.5+0.5*light);
+      c.fillStyle='rgba(255,255,255,'+a.toFixed(3)+')';
+      c.fillRect(x,0,3,1);
+      if(Math.sin(t*1.1+x*0.5)>0.6) c.fillRect(x+1,1,2,1);
+    }
+    /* drifting marine snow */
+    for(const s of scene.snow){
+      c.fillStyle='rgba(235,248,255,'+(s.a*(0.5+0.5*light)).toFixed(3)+')';
+      c.fillRect(Math.round(s.x),Math.round(s.y),1,1);
+    }
+    /* sand glints */
+    for(let i=0;i<9;i++){
+      const v=Math.sin(t*2.1+i*1.9);
+      if(v<0.8) continue;
+      const x=hash2(i,31)%SW,y=SAND_Y+1+hash2(i,32)%12;
+      c.fillStyle=v>0.95?'rgba(255,255,255,.95)':'rgba(255,255,255,.6)';
+      c.fillRect(x,y,1,1);
+      if(v>0.95){c.fillRect(x-1,y,3,1);c.fillRect(x,y-1,1,3);}
+    }
+  }
+}
+function drawRipples(c){
+  for(const e of scene.ripples){
+    const k=e.t/e.dur,rr=e.max*(1-Math.pow(1-k,2));
+    if(rr<1) continue;
+    c.fillStyle='rgba('+e.col+','+((1-k)*0.7).toFixed(2)+')';
+    const steps=Math.max(10,Math.round(rr*2.6));
+    for(let i=0;i<steps;i++){
+      const th=i/steps*6.2832;
+      c.fillRect(Math.round(e.x+Math.cos(th)*rr),Math.round(e.y+Math.sin(th)*rr*e.ry),1,1);
+    }
+  }
+}
+function drawMurk(c){
+  if(scene.vw>25){c.fillStyle='rgba(120,105,50,'+(clamp((scene.vw-25)/75,0,1)*0.45).toFixed(3)+')';c.fillRect(0,0,SW,SH);}
+}
+function drawAlgae(c){
+  const va=scene.va;
+  if(va<=8) return;
+  const a=va/100,bx=scene.wipe?Math.round(scene.wipe.x):-1;
+  c.fillStyle='rgba(60,150,60,'+(a*0.22).toFixed(3)+')';
+  const x0=Math.max(0,bx);
+  c.fillRect(x0,0,SW-x0,SH);
+  const n=Math.round(a*70);
+  for(let i=0;i<n;i++){
+    const h=hash2(i,5),side=h%3;
+    const gx=side===0?(h>>4)%10:(side===1?SW-1-(h>>4)%10:(h>>4)%SW);
+    if(gx<bx) continue;
+    const gy=(hash2(i,9)%(SAND_Y-4))+2;
+    R(c,i%3?'#3d9a3f':'#56b850',gx,gy,1+(h>>9)%2,1+(h>>11)%2);
+  }
+}
+function drawWipe(c){
+  const w=scene.wipe;if(!w) return;
+  /* soapy band along the sponge's edge */
+  c.fillStyle='rgba(235,252,255,.35)';c.fillRect(Math.round(w.x)-2,0,2,SAND_Y);
+  /* the sponge */
+  const sx=Math.round(w.x)-5,sy=Math.round(w.y)-4;
+  R(c,'#b9892a',sx,sy+7,10,1);
+  R(c,'#f2d36b',sx,sy,10,7);R(c,'#ffe58f',sx,sy,10,1);
+  R(c,'#d6b34a',sx+2,sy+2,2,2);R(c,'#d6b34a',sx+6,sy+4,2,2);R(c,'#d6b34a',sx+7,sy+1,1,1);
+}
+function drawSwirl(c){
+  const w=scene.swirl;if(!w) return;
+  const k=w.t/w.dur;
+  const front=Math.min(SAND_Y,SAND_Y*Math.min(1,w.t/0.55));
+  c.fillStyle='rgba(170,235,255,'+(0.26*(1-k)).toFixed(3)+')';
+  c.fillRect(0,0,SW,Math.round(front));
+  if(w.t<0.55){c.fillStyle='rgba(235,252,255,.7)';c.fillRect(0,Math.round(front),SW,1);}
+  const fade=1-k,grow=0.4+0.6*Math.min(1,w.t/0.5);
+  for(let i=0;i<26;i++){
+    const u=i/26,ang=w.t*6.5+u*9.4,rr=(6+u*52)*grow;
+    const x=80+Math.cos(ang)*rr*1.45,y=54+Math.sin(ang)*rr*0.55;
+    c.fillStyle='rgba(255,255,255,'+(fade*(0.35+0.4*u)).toFixed(2)+')';
+    const sz=u>0.6?2:1;
+    c.fillRect(Math.round(x),Math.round(y),sz,sz);
+  }
+}
+function drawParts(c){
+  for(const p of scene.parts){
+    const k=p.t/p.life;
+    c.globalAlpha=k<0.6?1:Math.max(0,1-(k-0.6)/0.4);
+    c.fillStyle=p.col;
+    const x=Math.round(p.x),y=Math.round(p.y);
+    if(p.shape==='plus'&&k<0.65){c.fillRect(x-1,y,3,1);c.fillRect(x,y-1,1,3);}
+    else{const z=p.sz||1;c.fillRect(x,y,z,z);}
+  }
+  c.globalAlpha=1;
+}
+/* ================= UI ================= */
+let curTab='tank';
+let sheetState=null;
+let breedSel={a:null,b:null};
+let lastActions='';
+let toastTimer=0;
+let bookKind='fish';
+const NEWS_V=3;
+let devOn=false,devTaps=0,devTimer=0;
+const KINDS=['fish','shrimp','jelly'];
+
+function toast(msg,cls){
+  const t=$('#toast');
+  t.hidden=true;void t.offsetWidth;   /* restart the pop-in */
+  t.className='toast'+(cls?' '+cls:'');t.textContent=msg;t.hidden=false;
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.hidden=true;},cls==='big'?3400:2600);
+}
+
+/* ---------- juice: coins, floaters, pops ---------- */
+const coinView={shown:null,target:null,hold:0,raf:0};
+function setCoinText(v){coinView.shown=v;$('#coins').textContent=Math.round(v);}
+function bumpCoins(){
+  if(REDUCED) return;
+  const el=$('.coins');el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');
+}
+function floatText(txt,x,y,cls){
+  if(REDUCED) return;
+  const el=document.createElement('div');
+  el.className='floatnum '+(cls||'up');el.textContent=txt;
+  el.style.left=x+'px';el.style.top=y+'px';
+  document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
+}
+function coinAnchor(){const r=$('.coins').getBoundingClientRect();return [r.left+r.width/2,r.bottom+2];}
+function snapCoins(){
+  cancelAnimationFrame(coinView.raf);
+  coinView.hold=0;coinView.shown=null;coinView.target=null;
+  renderCoins();
+}
+/* the counter eases to whatever S.coins is, unless coins are mid-flight */
+function renderCoins(){
+  if(!S||coinView.hold>0) return;
+  const to=S.coins;
+  if(coinView.shown===null||REDUCED||document.hidden){
+    cancelAnimationFrame(coinView.raf);coinView.target=to;setCoinText(to);return;
+  }
+  if(coinView.target===to) return;
+  const from=coinView.shown,d=to-from;
+  coinView.target=to;
+  cancelAnimationFrame(coinView.raf);
+  if(Math.abs(d)<1){setCoinText(to);return;}
+  const a=coinAnchor();
+  floatText((d>0?'+':'\u2212')+Math.round(Math.abs(d)),a[0],a[1],d>0?'up':'dn');
+  bumpCoins();
+  const t0=performance.now(),dur=clamp(260+Math.abs(d)*3,320,800);
+  const step=now=>{
+    const k=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-k,3);
+    setCoinText(from+d*e);
+    if(k<1) coinView.raf=requestAnimationFrame(step);
+  };
+  coinView.raf=requestAnimationFrame(step);
+}
+/* n coins were just added to S.coins; the counter still shows `base`. Fly them in one by one. */
+function flyCoins(n,ox,oy,base){
+  const tgt=$('.coins').getBoundingClientRect();
+  if(REDUCED||document.hidden||!tgt.width||!Element.prototype.animate){renderCoins();return;}
+  const cnt=Math.min(n,clamp(Math.round(Math.sqrt(n)*2.2),3,14));
+  cancelAnimationFrame(coinView.raf);
+  coinView.hold++;coinView.target=null;setCoinText(base);
+  const icon=$('#coinIc').getBoundingClientRect();
+  const tx=icon.left+icon.width/2,ty=icon.top+icon.height/2,share=n/cnt;
+  let landed=0,released=false;
+  const release=()=>{
+    if(released) return;released=true;
+    coinView.hold=Math.max(0,coinView.hold-1);
+    if(coinView.hold===0){
+      const a=coinAnchor();floatText('+'+n,a[0],a[1],'up');
+      coinView.target=null;renderCoins();
+    }
+  };
+  setTimeout(release,2600);
+  for(let i=0;i<cnt;i++){
+    setTimeout(()=>{
+      const el=document.createElement('div');
+      el.className='flycoin';el.innerHTML=ic('coin',2);
+      document.body.appendChild(el);
+      const w=el.offsetWidth||14,h=el.offsetHeight||14;
+      const sx=ox-w/2,sy=oy-h/2,ex=tx-w/2,ey=ty-h/2;
+      const mx=sx+jrnd(-34,34),my=sy-jrnd(16,46);
+      const anim=el.animate([
+        {transform:`translate(${sx}px,${sy}px) scale(.5)`,opacity:0.2,easing:'cubic-bezier(.2,.8,.3,1)',offset:0},
+        {transform:`translate(${mx}px,${my}px) scale(1.15)`,opacity:1,easing:'cubic-bezier(.55,0,.9,.6)',offset:0.3},
+        {transform:`translate(${ex}px,${ey}px) scale(.7)`,opacity:1,offset:1}
+      ],{duration:jrnd(640,820),fill:'forwards'});
+      anim.onfinish=()=>{
+        el.remove();landed++;
+        if(!released){setCoinText((coinView.shown||0)+share);sfx.ping(i);bumpCoins();}
+        if(landed===cnt) release();
+      };
+    },i*55);
+  }
+}
+function pileOrigin(){
+  const cv=scene.cv.getBoundingClientRect();
+  const x=cv.left+147/SW*cv.width,y=cv.top+(SAND_Y+8)/SH*cv.height;
+  if(cv.width>0&&y>0&&y<innerHeight) return [x,y];
+  const b=$('[data-act="collect"]'),r=b&&b.getBoundingClientRect();
+  return r&&r.width?[r.left+r.width/2,r.top+r.height/2]:[innerWidth/2,innerHeight*0.55];
+}
+function popEl(el){
+  if(REDUCED||!el) return;
+  let t=el;
+  if(!t.isConnected&&el.dataset&&el.dataset.act) t=document.querySelector('[data-act="'+el.dataset.act+'"]'+(el.dataset.id?'[data-id="'+el.dataset.id+'"]':''));
+  if(!t) return;
+  t.classList.remove('pop');void t.offsetWidth;t.classList.add('pop');
+}
+function shake(el){
+  if(REDUCED||!el) return;
+  el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake');
+}
+/* celebration text from the sim: show the most exciting one, a beat after the sparkles start */
+const JPRI={species:5,hyb:5,rare:4,gene:2};
+function flushJuice(){
+  let best=null;
+  for(const e of JUICE_Q){
+    if(!e.msg||e.uiDone) continue;
+    e.uiDone=true;
+    if(!best||(JPRI[e.kind]||0)>(JPRI[best.kind]||0)) best=e;
+  }
+  if(best){const m=best.msg;setTimeout(()=>toast(m,'big'),REDUCED?0:850);}
+}
+const coinHtml=n=>`<span class="price">${ic('coin',2)}<span>${n}</span></span>`;
+const barCls=(pct,g,w)=>pct>g?'':(pct>w?'warn':'bad');
+const pctW=v=>Math.round(clamp(v,0,100));
+const plural=(n,one,many)=>n===1?one:(many||one+'s');
+const names=(list,max)=>{
+  const a=list.slice(0,max||2).map(f=>f.name).join(' and ');
+  return a+(list.length>(max||2)?' and others':'');
+};
+
+function buildNav(){
+  const tabs=[['tank','Tank','tank'],['fish','Crew','fish'],['breed','Breed','heart'],['shop','Shop','bag'],['book','Book','book']];
+  $('#tabs').innerHTML=tabs.map(([id,label,icon])=>`<button data-act="tab" data-tab="${id}" class="${id===curTab?'on':''}" aria-label="${label}">${ic(icon,2)}<span>${label}</span><i class="dot" id="dot-${id}"></i></button>`).join('');
+  $('#coinIc').innerHTML=ic('coin',2);
+  $('#btnSettings').innerHTML=ic('gear',2);
+  renderSoundBtn();
+}
+function renderSoundBtn(){
+  const off=!!(S&&!S.sound);
+  const b=$('#btnSound');
+  b.innerHTML=ic(off?'mute':'sound',2);
+  b.setAttribute('aria-label',off?'Turn sound on':'Turn sound off');
+  b.setAttribute('aria-pressed',off?'false':'true');
+}
+function setTab(name){
+  curTab=name;
+  $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
+  $$('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+name));
+  if(name!=='tank'&&scene.decorMode) toggleDecor(false);
+  renderTab(name);
+  $('#main').scrollTop=0;
+}
+function renderTab(name){
+  if(!S) return;
+  if(name==='tank') updateTankUI();
+  else{
+    const el=$('#tab-'+name);
+    el.innerHTML=({fish:htmlFish,breed:htmlBreed,shop:htmlShop,book:htmlBook})[name]();
+    paintAllCanvases(el);
+  }
+}
+function refreshActive(){
+  if(!S) return;
+  renderCoins();
+  $('#dot-tank').classList.toggle('on',needsAttention());
+  $('#dot-breed').classList.toggle('on',S.eggs.some(e=>e.t<=0));
+  if(curTab==='tank') updateTankUI();
+  else if(!sheetState) renderTab(curTab);
+  if(sheetState&&(sheetState.kind==='fish'||sheetState.kind==='polyp')) renderSheet(true);
+}
+
+/* ---------- tank tab ---------- */
+function hintText(){
+  const sick=S.fish.filter(f=>f.sick);
+  if(sick.length) return `${names(sick)} ${sick.length>1?'are':'is'} sick. Give medicine and keep the water clean.`;
+  const hungry=S.fish.filter(f=>f.hunger<35);
+  if(hungry.length) return `${names(hungry)} ${hungry.length>1?'look':'looks'} hungry. Tap Feed.`;
+  if(S.fish.some(f=>SP[f.sp].sens)&&S.waste>32) return 'Jellyfish are picky about clean water. Change some water soon.';
+  if(S.waste>60) return 'The water is getting murky. Change some water.';
+  if(S.filter<20) return 'The filter is clogged. Rinse it.';
+  if(S.algae>60) return 'Algae is covering the glass. Give it a scrub.';
+  const chilling=S.polyps.filter(p=>p.chill>0&&p.size>=2);
+  if(chilling.length){
+    const best=Math.max(...chilling.map(p=>p.chill));
+    return `Your polyps are cooling down, ${pctW(100*best/POLYP_CHILL_MIN)}% of the way. Warm the tank back up once baby jellies appear.`;
+  }
+  const off=S.fish.filter(f=>tempOff(f)>0.5);
+  if(off.length) return `${off[0].name}${off.length>1?' and others are':' is'} not comfy at ${S.temp.toFixed(0)}°C. Try a different heater setting.`;
+  const ready=S.eggs.filter(e=>e.t<=0);
+  if(ready.length){
+    return ready[0].kids.every(k=>viaPolyp(k.sp))?'Larvae are ready to settle, but the polyp bed is full.':'Eggs are ready to hatch, but the tank is full. Make room.';
+  }
+  if(S.pile>=1) return `${Math.floor(S.pile)} ${plural(Math.floor(S.pile),'coin is','coins are')} waiting. Tap the pile or Collect.`;
+  if(!S.fish.length) return 'Your tank is empty. Visit the shop to get your first fish.';
+  if(S.polyps.some(p=>p.size>=2)) return 'Your polyps are ready. Open one on the Crew tab to see how to wake them.';
+  const inc=S.fish.reduce((a,f)=>a+incomePerHour(f),0);
+  return `All calm. Your crew earns about ${Math.round(inc)} coins an hour.`;
+}
+function updateTankUI(){
+  const T=TANKS[S.tankLvl];
+  renderCoins();
+  $('#tankInfo').textContent=`${T.n} ${T.l} · space ${fmtSpace(usedSpace())}/${T.cap}`;
+  $('#tankHint').textContent=hintText();
+  const water=100-S.waste,glass=100-S.algae;
+  const setBar=(id,pct,g,w)=>{const b=$('#'+id);b.className='bar '+barCls(pct,g,w);b.firstElementChild.style.width=pctW(pct)+'%';};
+  setBar('bWater',water,50,30);setBar('bFilter',S.filter,40,15);setBar('bGlass',glass,40,20);
+  $('#mWater').textContent=pctW(water)+'%';
+  $('#mFilter').textContent=pctW(S.filter)+'%';
+  $('#mGlass').textContent=pctW(glass)+'%';
+  $('#mTemp').textContent=S.temp.toFixed(1)+'°C';
+  const comfy=S.fish.filter(f=>tempOff(f)<=0.5).length;
+  $('#tTemp').textContent=!S.fish.length?'Nobody here yet':(Math.abs(S.temp-S.heater)>0.4?`Heating to ${S.heater}°`:`${comfy}/${S.fish.length} comfy`);
+  const sick=sickCount();
+  const n=Math.floor(S.pile);
+  const html=[
+    `<button class="btn gold wide" data-act="collect" ${n<1?'disabled':''}>${ic('coin',2)}${n<1?'Coin pile is empty':'Collect '+n+' '+plural(n,'coin')}</button>`,
+    `<button class="btn primary" data-act="feed">${ic('food',2)}Feed</button>`,
+    `<button class="btn" data-act="scrub" ${S.algae<3?'disabled':''}>${ic('scrub',2)}Scrub glass</button>`,
+    `<button class="btn" data-act="water" ${S.waste<6?'disabled':''}>${ic('drop',2)}Change water</button>`,
+    `<button class="btn" data-act="rinse" ${S.filter>95?'disabled':''}>${ic('filter',2)}Rinse filter</button>`,
+    sick?`<button class="btn danger two" data-act="treat"><span class="lbl">${ic('pill',2)}Treat ${sick}</span><small>${S.meds} medicine</small></button>`:'',
+    `<div class="stepper"><button data-act="heat-dn" aria-label="Lower heater">−</button><div class="val">${S.heater}°C<small>Heater</small></div><button data-act="heat-up" aria-label="Raise heater">+</button></div>`,
+    S.feeder.owned?`<button class="btn two" data-act="refill" ${S.feeder.stock>=12||S.coins<12?'disabled':''}><span class="lbl">${ic('food',2)}Refill feeder</span><small>${S.feeder.stock}/12 · 12 coins</small></button>`:''
+  ].join('');
+  if(html!==lastActions){$('#actions').innerHTML=html;lastActions=html;}
+  $('#decorBtn').classList.toggle('on',scene.decorMode);
+  $('#decorBtn').textContent=scene.decorMode?'Done decorating':'Decorate';
+}
+function toggleDecor(on){
+  scene.decorMode=on;
+  $('#decorBtn').classList.toggle('on',on);
+  $('#decorBtn').textContent=on?'Done decorating':'Decorate';
+  if(on) toast('Tap the sand to place decor.');
+}
+function doCollect(){
+  const base=S.coins;
+  const n=collectPile();
+  if(!n) return;
+  audioResume();sfx.coin();
+  const o=pileOrigin();
+  burst('sparkle',147,SAND_Y+8,{n:8,cols:['#fff1a8','#ffffff','#f4c542']});
+  scene.pileN=0;
+  flyCoins(n,o[0],o[1],base);
+  changed();
+}
+
+/* ---------- crew tab ---------- */
+function moodChip(f){const m=mood(f);return `<span class="chip ${m[1]}">${m[0]}</span>`;}
+function fishCard(f,extra,tag){
+  return `<button class="fcard ${extra||''}" data-act="${tag||'fish'}" data-id="${f.id}">
+    <div class="pic"><canvas data-fish="${f.id}" width="64" height="54"></canvas></div>
+    <div class="nm">${f.name}</div>
+    <div class="sub">${speciesLabel(f)} · ${stageName(f)}</div>
+    <div class="chips">${moodChip(f)}${isBerried(f)?'<span class="chip good">Eggs</span>':''}</div>
+    <div class="bar ${barCls(f.hunger,45,25)}" title="Hunger"><i style="width:${pctW(f.hunger)}%"></i></div>
+  </button>`;
+}
+function polypCard(p){
+  const chill=pctW(100*p.chill/POLYP_CHILL_MIN);
+  return `<button class="fcard" data-act="polyp" data-id="${p.id}">
+    <div class="pic"><canvas data-polyp="${p.id}" width="64" height="54"></canvas></div>
+    <div class="nm">${speciesLabel(p)} polyps</div>
+    <div class="sub">Colony size ${p.size.toFixed(1)}</div>
+    <div class="chips">${p.size<2?'<span class="chip">Growing</span>':(chill>0?'<span class="chip ok">Cooling '+chill+'%</span>':'<span class="chip good">Ready</span>')}</div>
+    <div class="bar ${chill>0?'warn':''}" title="Chill"><i style="width:${chill}%"></i></div>
+  </button>`;
+}
+function htmlFish(){
+  if(!S.fish.length&&!S.polyps.length) return `<p class="hint">Nobody here yet. Visit the shop to get your first fish.</p>`;
+  const kinds=KINDS.filter(k=>S.fish.some(f=>kindOf(f)===k));
+  let out=`<div class="row2"><h2 class="sec-title">Your crew · space ${fmtSpace(usedSpace())}/${capacity()}</h2></div>`;
+  for(const k of kinds){
+    const list=S.fish.filter(f=>kindOf(f)===k);
+    out+=`${kinds.length>1?`<h2 class="sec-title">${KIND_NAMES[k]} · ${list.length}</h2>`:''}<div class="grid">${list.map(f=>fishCard(f)).join('')}</div>`;
+  }
+  if(S.fish.length) out+=`<p class="hint">Tap one to see its genes, its nature, or to treat or sell it.</p>`;
+  if(S.polyps.length||S.fish.some(f=>viaPolyp(f.sp))){
+    out+=`<h2 class="sec-title">Polyp colonies · ${S.polyps.length}/${polypCap()}</h2>`;
+    out+=S.polyps.length?`<div class="grid">${S.polyps.map(polypCard).join('')}</div><p class="hint">Polyps grow slowly on the sand. Cool the tank and they bud off baby jellies.</p>`
+      :`<p class="hint">Breed two adult jellies and their larvae will settle here as polyps.</p>`;
+  }
+  return out;
+}
+
+/* ---------- breed tab ---------- */
+function selFish(id){return id?S.fish.find(f=>f.id===id)||null:null;}
+function eggHtml(e){
+  const ready=e.t<=0,pct=100*(1-e.t/e.total);
+  const nL=e.kids.filter(k=>viaPolyp(k.sp)).length,nE=e.kids.length-nL;
+  const car=e.carrier?S.fish.find(f=>f.id===e.carrier):null;
+  const parts=[];
+  if(nE) parts.push(`${nE} ${plural(nE,'egg')}`);
+  if(nL) parts.push(`${nL} ${plural(nL,'larva','larvae')}`);
+  let title=parts.join(' + ');
+  if(car) title+=' carried by '+car.name;
+  if(e.kids.some(k=>k.hyb)) title+=' (hybrid)';
+  const where=nL&&nE?'Ready, waiting for room.':(nL?'Ready to settle, waiting for room in the polyp bed.':'Ready to hatch, waiting for room in the tank.');
+  const when=nL&&!nE?'Settles as a polyp in ':'Hatches in ';
+  const status=ready?where:when+fmtDur(e.t);
+  return `<div class="card egg"><div class="row2"><b>${title}</b><span class="hint">${e.parents[0]} × ${e.parents[1]}</span></div>
+    <div class="bar ${ready?'warn':'hp'}"><i style="width:${pctW(pct)}%"></i></div>
+    <span class="hint">${status}</span></div>`;
+}
+function htmlBreed(){
+  let a=selFish(breedSel.a),b=selFish(breedSel.b);
+  if(!a) breedSel.a=null; if(!b) breedSel.b=null;
+  const slot=(f,which)=>`<div class="card slot" >${f?`<button class="fcard" style="width:100%" data-act="pick-slot" data-which="${which}"><div class="pic"><canvas data-fish="${f.id}" width="64" height="54"></canvas></div><div class="nm">${f.name}</div><div class="sub">${speciesLabel(f)}</div></button>`:`<button class="btn" data-act="pick-slot" data-which="${which}" style="width:100%;min-height:120px">${ic('plus',3)}Pick ${which==='a'?'first':'second'}</button>`}</div>`;
+  const block=pairBlock(a,b);
+  const kind=a?kindOf(a):(b?kindOf(b):'fish');
+  const same=a&&b&&kindOf(a)===kindOf(b),mixed=same&&a.sp!==b.sp;
+  let pred='';
+  if(same){
+    const larvae=kind==='jelly'&&viaPolyp(a.sp)&&viaPolyp(b.sp);
+    pred=`<div class="card pred"><h2 class="sec-title" style="margin:0">Likely ${larvae?'larvae':'offspring'}</h2>`+
+      (mixed?`<div class="r"><span>Species</span><div class="chips"><span class="chip rare dom">${shortName(a.sp)} 50%</span><span class="chip rare dom">${shortName(b.sp)} 50%</span></div></div>`:'')+
+      lociOf(kind).map(k=>{
+        const rows=predictLocus(k,a,b);
+        if(k==='sheen'&&rows.length===1&&rows[0].label==='None') return '';
+        return `<div class="r"><span>${LD(kind,k).label}</span><div class="chips">${rows.map(p=>`<span class="chip ${p.rare?'rare dom':''}">${p.sw?`<i class="sw" style="background:${p.sw}"></i>`:''}${p.label} ${Math.round(p.p*100)}%</span>`).join('')}</div></div>`;
+      }).join('')+
+      `<p class="hint">Each gene can also mutate into a rare one, about 1 in 50 per gene.</p></div>`;
+  }
+  const eggs=S.eggs.map(eggHtml).join('');
+  const how=[];
+  if(!a&&!b) how.push('Fish lay eggs. Shrimp carry theirs. Most jellies make larvae that settle as polyps. Different species of the same kind can cross.');
+  else{
+    if(kind==='jelly'&&a&&SP[a.sp].direct) how.push('Comb jellies skip the polyp stage. Their eggs hatch straight into tiny comb jellies.');
+    else if(kind==='jelly') how.push('Jelly larvae settle as polyp colonies. Cool the tank and the polyps bud off baby jellies with the same genes.');
+    else if(kind==='shrimp') how.push('One of the pair carries the eggs until they hatch.');
+    else how.push('Eggs hatch into fry that grow up in the tank.');
+    if(mixed) how.push('Mixed pairs make hybrids. They are sterile, but worth more and get their own Book page.');
+  }
+  how.push(`Only adults can breed, and parents rest for ${fmtDur(COOLDOWN_MIN)} afterwards.`);
+  return `<h2 class="sec-title">Pick a pair</h2>
+    <div class="pair">${slot(a,'a')}${slot(b,'b')}</div>
+    ${pred}
+    <button class="btn primary" data-act="breed-go" ${block?'disabled':''}>${ic('heart',2)}${block||'Pair them up'}</button>
+    <p class="hint">${how.join(' ')}</p>
+    <h2 class="sec-title">Nursery · ${S.eggs.length}/${NURSERY_MAX}</h2>
+    ${eggs||'<p class="hint">Nothing growing right now.</p>'}`;
+}
+
+/* ---------- shop tab ---------- */
+function shopRow(sp){
+  const room=hasRoom(sp.id),broke=S.coins<sp.price;
+  const bits=[`${sp.lo}–${sp.hi}°C`];
+  const quirk=sp.quirk?`<span style="color:var(--accent)">${sp.quirk}</span>`:'';
+  if(sp.algae) bits.push('eats algae');
+  if(sp.sens) bits.push('needs very clean water');
+  bits.push(`uses ${fmtSpace(sp.w)} space`);
+  return `<div class="card shop-item">
+      <div class="pic"><canvas data-species="${sp.id}" width="64" height="54"></canvas></div>
+      <div class="txt"><b>${sp.n}</b><span>${sp.blurb}</span>${quirk}<span>${bits.join(' · ')}</span></div>
+      <button class="btn buy" data-act="buy-fish" data-id="${sp.id}" ${(broke||!room)?'disabled':''}>${!room?'No room':'Buy'}${coinHtml(sp.price)}</button>
+    </div>`;
+}
+function htmlShop(){
+  const blurbs={fish:'',shrimp:'<p class="hint">Small, gentle and busy. They graze on algae and only need about half a spot. Pairs breed, and the mother carries the eggs.</p>',jelly:'<p class="hint">Six very different jellies. Most breed through larvae and polyps: cool the tank to make more. Comb jellies just lay eggs. All need very clean water.</p>'};
+  const fishRows=KINDS.map(k=>`<h2 class="sec-title">${KIND_NAMES[k]}</h2>${blurbs[k]}${SPECIES.filter(sp=>sp.kind===k).map(shopRow).join('')}`).join('');
+  const placed=id=>S.decor.slots.filter(x=>x===id).length;
+  const decorRows=DECOR_DEF.map(d=>`<div class="card plain-item"><div class="txt"><b>${d.n}</b><span>${d.plant?'Plant · cleaner water · ':''}Owned ${S.decor.owned[d.id]||0}${placed(d.id)?` (${placed(d.id)} placed)`:''}</span></div>
+      <button class="btn buy" data-act="buy-decor" data-id="${d.id}" ${S.coins<d.price?'disabled':''}>Buy${coinHtml(d.price)}</button></div>`).join('');
+  const nt=TANKS[S.tankLvl+1],nf=FILTERS[S.filterLvl+1];
+  const up=[];
+  up.push(nt?`<div class="card plain-item"><div class="txt"><b>${nt.n} ${nt.l}</b><span>Space for ${nt.cap} · ${polypCap()+1} polyp spots · cleaner water</span></div><button class="btn buy" data-act="buy-tank" ${S.coins<nt.price?'disabled':''}>Upgrade${coinHtml(nt.price)}</button></div>`:`<div class="card plain-item"><div class="txt"><b>${TANKS[S.tankLvl].n}</b><span>Your tank is the biggest one.</span></div></div>`);
+  up.push(nf?`<div class="card plain-item"><div class="txt"><b>${nf.n}</b><span>Stays clean for ${nf.life} hours instead of ${FILTERS[S.filterLvl].life}</span></div><button class="btn buy" data-act="buy-filter" ${S.coins<nf.price?'disabled':''}>Upgrade${coinHtml(nf.price)}</button></div>`:`<div class="card plain-item"><div class="txt"><b>${FILTERS[S.filterLvl].n}</b><span>Your filter is the best one.</span></div></div>`);
+  up.push(S.feeder.owned?`<div class="card plain-item"><div class="txt"><b>Auto feeder</b><span>${S.feeder.stock}/12 portions left. Feeds a hungry one while you are away.</span></div><button class="btn buy" data-act="refill" ${(S.feeder.stock>=12||S.coins<12)?'disabled':''}>Refill +6${coinHtml(12)}</button></div>`:`<div class="card plain-item"><div class="txt"><b>Auto feeder</b><span>Feeds a hungry one while you are away. Comes with 6 portions.</span></div><button class="btn buy" data-act="buy-feeder" ${S.coins<100?'disabled':''}>Buy${coinHtml(100)}</button></div>`);
+  const themeRows=THEMES.map(t=>{
+    const own=S.themes&&S.themes[t.id],on=S.theme===t.id;
+    return `<div class="card plain-item"><div class="txt"><b>${t.n}</b><span>${on?'In use':(own?'Owned':'Changes the water and backdrop')}</span></div>
+      ${own?`<button class="btn buy" data-act="use-theme" data-id="${t.id}" ${on?'disabled':''}>${on?'In use':'Use'}</button>`:`<button class="btn buy" data-act="buy-theme" data-id="${t.id}" ${S.coins<t.price?'disabled':''}>Buy${coinHtml(t.price)}</button>`}</div>`;
+  }).join('');
+  return `${fishRows}
+    <h2 class="sec-title">Care</h2>
+    <div class="card plain-item"><div class="txt"><b>Medicine</b><span>Cures one sick friend. You have ${S.meds}.</span></div><button class="btn buy" data-act="buy-med" ${S.coins<15?'disabled':''}>Buy${coinHtml(15)}</button></div>
+    ${up.join('')}
+    <h2 class="sec-title">Decor</h2>${decorRows}
+    <h2 class="sec-title">Water look</h2>${themeRows}`;
+}
+
+/* ---------- book tab ---------- */
+function alleleChip(kind,key,i,known){
+  const o=LD(kind,key).opts[i];
+  if(!known) return `<span class="chip lock ${o.r?'rare':''}">${o.r?'Rare ':''}???</span>`;
+  return `<span class="chip ${o.r?'rare dom':''}">${(key==='color'||key==='accent')?`<i class="sw" style="background:${o.c}"></i>`:''}${o.n}</span>`;
+}
+const possibleHybrids=()=>KINDS.reduce((n,k)=>{const c=SPECIES.filter(x=>x.kind===k).length;return n+c*(c-1)/2;},0);
+function htmlBook(){
+  let total=0,found=0;
+  for(const kd of KINDS) for(const k of lociOf(kd)){total+=LD(kd,k).opts.length;found+=Object.keys(S.book.al[kd+'.'+k]||{}).length;}
+  const spFound=Object.keys(S.book.sp).length;
+  const morphs=Object.keys(S.book.morph).length;
+  const tabs=KINDS.concat(['hyb']);
+  const seg=`<div class="seg" role="group" aria-label="Collection">${tabs.map(k=>`<button data-act="book-kind" data-kind="${k}" class="${k===bookKind?'on':''}">${k==='hyb'?'Hybrids':KIND_NAMES[k]}</button>`).join('')}</div>`;
+  const head=`<div class="card stat3"><div><b>${spFound}/${SPECIES.length}</b><span>Species</span></div><div><b>${found}/${total}</b><span>Genes</span></div><div><b>${morphs}</b><span>Looks</span></div></div>${seg}`;
+  const foot=`<div class="card stat3"><div><b>${S.stats.bred}</b><span>Pairings</span></div><div><b>${S.stats.hybrids||0}</b><span>Hybrids</span></div><div><b>${S.stats.earned}</b><span>Coins earned</span></div></div>`;
+  if(bookKind==='hyb'){
+    const keys=Object.keys(S.book.hyb||{}).filter(k=>k.split(':').every(id=>SP[id])).sort();
+    const cards=keys.map(k=>{
+      const [a,b]=k.split(':');
+      return `<div class="fcard lockd" style="cursor:default"><div class="pic"><canvas data-hyb="${a}:${b}" width="64" height="54"></canvas></div><div class="nm">${shortName(a)} × ${shortName(b)}</div><div class="sub">${KIND_NAMES[SP[a].kind]} hybrid</div></div>`;
+    }).join('');
+    return `${head}
+      <h2 class="sec-title">Hybrids · ${keys.length}/${possibleHybrids()}</h2>
+      <p class="hint">Pair two different species of the same kind. The babies are sterile, but worth more and look like a mix of both.</p>
+      ${cards?`<div class="grid">${cards}</div>`:'<p class="hint">No hybrids yet. Try pairing two different fish.</p>'}
+      ${foot}`;
+  }
+  const spCards=SPECIES.filter(sp=>sp.kind===bookKind).map(sp=>{
+    const k=!!S.book.sp[sp.id];
+    return `<div class="fcard lockd" style="cursor:default"><div class="pic"><canvas data-species="${sp.id}" data-sil="1" width="64" height="54"></canvas></div><div class="nm">${k?sp.n:'???'}</div><div class="sub">${k?sp.blurb:'Not collected yet'}</div></div>`;
+  }).join('');
+  const genes=lociOf(bookKind).map(k=>{
+    const L=LD(bookKind,k),got=S.book.al[bookKind+'.'+k]||{};
+    return `<div><h2 class="sec-title" style="margin-bottom:6px">${L.label} genes · ${Object.keys(got).length}/${L.opts.length}</h2><div class="chips">${L.opts.map((o,i)=>alleleChip(bookKind,k,i,!!got[i])).join('')}</div></div>`;
+  }).join('');
+  return `${head}
+    <h2 class="sec-title">${KIND_NAMES[bookKind]} species</h2><div class="grid">${spCards}</div>
+    <h2 class="sec-title">Gene collection</h2>
+    <p class="hint">Rare genes only appear by mutation when you breed. They hide as carriers until two carriers meet.</p>
+    <div class="lgrid">${genes}</div>
+    ${foot}`;
+}
+
+/* ---------- sheets ---------- */
+function openSheet(kind,arg){sheetState={kind,arg:arg??null,armed:false};renderSheet();}
+function closeSheet(){
+  const was=sheetState&&sheetState.kind;
+  sheetState=null;$('#sheet').hidden=true;
+  if(was==='away'&&S&&(S.news||0)<NEWS_V){const prev=S.news||0;S.news=NEWS_V;openSheet('news',prev);return;}
+  if(curTab!=='tank') renderTab(curTab);
+}
+function geneRow(f,k){
+  const kind=kindOf(f),L=LD(kind,k),pair=f.g[k],o=L.opts,same=pair[0]===pair[1];
+  let dom=-1;
+  if(k==='sheen') dom=(same&&pair[0]>0)?pair[0]:0;
+  else if(k!=='size') dom=expr(k,pair);
+  return `<div class="r"><span>${L.label}</span><div class="chips">${pair.map(i=>`<span class="chip ${(same&&k!=='size')||i===dom?'dom':''} ${o[i].r?'rare':''}">${(k==='color'||k==='accent')?`<i class="sw" style="background:${o[i].c}"></i>`:''}${o[i].n}</span>`).join('')}</div></div>`;
+}
+function geneBlock(f){
+  return `<div class="kv"><h2 class="sec-title" style="margin:0">Genes</h2>${lociOf(kindOf(f)).map(k=>geneRow(f,k)).join('')}
+      <p class="hint">Highlighted genes show on the creature. The other gene is carried and can be passed on.</p></div>`;
+}
+function sheetFish(f){
+  const sp=SP[f.sp],kind=kindOf(f),st=stageOf(f),inc=incomePerHour(f),tr=TRAIT[f.trait];
+  const nextAge=st<2?fmtDur(STAGE_AGE[st]-f.age):'';
+  return `<div class="hd"><h3>${f.name}</h3><button class="x" data-act="close" aria-label="Close">×</button></div>
+    <div class="fish-hero"><div class="pic"><canvas data-fish="${f.id}" width="64" height="54"></canvas></div>
+      <div class="kv" style="gap:6px"><b>${speciesLabel(f)}</b><span class="hint">${stageName(f)}${nextAge?' · adult in '+nextAge:''}</span><div class="chips">${moodChip(f)}${isBerried(f)?'<span class="chip good">Carrying eggs</span>':''}${f.cool>0&&st===2?`<span class="chip">Rests ${fmtDur(f.cool)}</span>`:''}</div></div></div>
+    <div class="kv">
+      <div class="r"><span>Food</span><div class="bar ${barCls(f.hunger,45,25)}"><i style="width:${pctW(f.hunger)}%"></i></div></div>
+      <div class="r"><span>Health</span><div class="bar ${barCls(f.health,60,35)}"><i style="width:${pctW(f.health)}%"></i></div></div>
+      <div class="r"><span>Nature</span><div class="hint"><b style="color:var(--fg)">${tr.n}.</b> ${tr.d}</div></div>
+      ${f.hyb?`<div class="r"><span>Hybrid</span><div class="hint">Sterile, but worth more.</div></div>`:(sp.quirk?`<div class="r"><span>Quirk</span><div class="hint">${sp.quirk}</div></div>`:'')}
+      <div class="r"><span>Likes</span><div class="hint">${rangeOf(f).lo}–${rangeOf(f).hi}°C${sp.sens?' · very clean water':''}</div></div>
+      <div class="r"><span>Worth</span><div>${coinHtml(fishValue(f))}</div></div>
+      <div class="r"><span>Earns</span><div class="hint">${inc>0?inc.toFixed(1)+' coins an hour':(st<1?'Starts when it is a juvenile':'Nothing while hungry or sick')}</div></div>
+    </div>
+    ${geneBlock(f)}
+    <div class="actions">
+      ${f.sick?`<button class="btn danger two" data-act="treat-one" data-id="${f.id}"><span class="lbl">${ic('pill',2)}Treat</span><small>${S.meds} medicine</small></button>`:''}
+      <button class="btn ${sheetState.armed?'danger':''}" data-act="sell" data-id="${f.id}">${sheetState.armed?'Tap again to sell for '+sellPrice(f):'Sell for '+sellPrice(f)}</button>
+    </div>`;
+}
+function sheetPolyp(p){
+  const cold=coldOf(p),pct=pctW(100*p.chill/POLYP_CHILL_MIN),grown=p.size>=2;
+  const cooled=S.temp<=cold+0.2;
+  let status;
+  if(S.waste>=60) status='The water is too dirty for the colony to grow. Change some water.';
+  else if(!grown) status=`Still growing. It needs a colony size of 2 before it can bud (${p.size.toFixed(1)} now).`;
+  else if(cooled) status=`Cold enough. Keep it cool for ${fmtDur(Math.max(0,POLYP_CHILL_MIN-p.chill))} more and baby jellies will bud off.`;
+  else status=`Cool the tank to ${cold}°C or lower and hold it for ${fmtDur(POLYP_CHILL_MIN)}. Then baby jellies bud off.`;
+  const room=hasRoom(p.sp);
+  return `<div class="hd"><h3>${speciesLabel(p)} polyps</h3><button class="x" data-act="close" aria-label="Close">×</button></div>
+    <div class="fish-hero"><div class="pic"><canvas data-polyp="${p.id}" width="64" height="54"></canvas></div>
+      <div class="kv" style="gap:6px"><b>Polyp colony</b><span class="hint">${p.was?p.was+' turned back into a polyp. Cool the tank to bring them back.':'Tiny jellies that stay on the sand and copy themselves.'}</span></div></div>
+    <div class="kv">
+      <div class="r"><span>Size</span><div class="bar"><i style="width:${pctW(100*p.size/8)}%"></i></div></div>
+      <div class="r"><span>Chill</span><div class="bar ${pct>0?'warn':''}"><i style="width:${pct}%"></i></div></div>
+    </div>
+    <p class="hint">${status}${room?'':' Babies also need room in the tank.'}</p>
+    <div class="actions">
+      <button class="btn" data-act="heat-set" data-t="${cold}" ${S.heater<=cold?'disabled':''}>Cool to ${cold}°C</button>
+      <button class="btn" data-act="heat-set" data-t="25" ${S.heater===25?'disabled':''}>Back to 25°C</button>
+    </div>
+    <p class="hint">Heads up: cold water makes warm-loving fish chilly. Warm the tank back up after the babies appear.</p>
+    ${geneBlock({sp:p.sp,g:p.g,hyb:p.hyb})}
+    <button class="btn ${sheetState.armed?'danger':''}" data-act="polyp-remove" data-id="${p.id}">${sheetState.armed?'Tap again to remove this colony':'Remove colony'}</button>`;
+}
+function sheetPick(which){
+  const other=selFish(breedSel[which==='a'?'b':'a']);
+  const list=S.fish.filter(f=>!other||f.id!==other.id);
+  const cards=list.map(f=>{
+    const why=breedBlock(f)||((other&&kindOf(other)!==kindOf(f))?'Different kind':'');
+    return `<button class="fcard ${why?'lockd':''}" data-act="pick-choose" data-id="${f.id}" data-which="${which}" ${why?'disabled':''}>
+      <div class="pic"><canvas data-fish="${f.id}" width="64" height="54"></canvas></div><div class="nm">${f.name}</div><div class="sub">${speciesLabel(f)}</div>
+      <div class="chips">${why?`<span class="chip warn">${why}</span>`:'<span class="chip good">Ready</span>'}</div></button>`;
+  }).join('');
+  return `<div class="hd"><h3>Pick one of your crew</h3><button class="x" data-act="close" aria-label="Close">×</button></div>
+    ${list.length?`<div class="grid">${cards}</div>`:'<p class="hint">Nobody else to pick.</p>'}
+    ${breedSel[which]?`<button class="btn" data-act="pick-clear" data-which="${which}">Clear this slot</button>`:''}`;
+}
+function sheetDecor(i){
+  const cur=S.decor.slots[i];
+  const avail=DECOR_DEF.filter(d=>(S.decor.owned[d.id]||0)-S.decor.slots.filter(x=>x===d.id).length>0);
+  return `<div class="hd"><h3>Sand spot ${i+1}</h3><button class="x" data-act="close" aria-label="Close">×</button></div>
+    ${cur?`<p class="hint">Now: ${DECOR[cur].n}</p>`:'<p class="hint">This spot is empty.</p>'}
+    <div class="actions">${avail.map(d=>`<button class="btn" data-act="place-decor" data-id="${d.id}" data-slot="${i}">${d.n}</button>`).join('')}</div>
+    ${avail.length?'':'<p class="hint">You have no spare decor. Buy some in the shop.</p>'}
+    ${cur?`<button class="btn danger" data-act="place-decor" data-id="" data-slot="${i}">Remove ${DECOR[cur].n}</button>`:''}`;
+}
+function sheetAway(a){
+  const ev=a.ev,lines=[];
+  const c=Math.floor(ev.coins);
+  if(c>=1) lines.push(`<li>Your crew made <b>${c}</b> ${plural(c,'coin')}. They are in the pile, ready to collect.</li>`);
+  else lines.push(`<li>Not many coins this time. Hungry or sick creatures do not earn.</li>`);
+  if(ev.hatched) lines.push(`<li><b>${ev.hatched}</b> ${ev.hatched>1?'babies hatched':'baby hatched'}.</li>`);
+  if(ev.settled) lines.push(`<li><b>${ev.settled}</b> ${plural(ev.settled,'larva settled','larvae settled')} as polyps.</li>`);
+  if(ev.released) lines.push(`<li><b>${ev.released}</b> baby ${plural(ev.released,'jelly')} budded off the polyps. Warm the tank back up when you like.</li>`);
+  if(ev.grown) lines.push(`<li><b>${ev.grown}</b> grew up a stage.</li>`);
+  if(ev.reverted&&ev.reverted.length) lines.push(`<li><b>${ev.reverted.join(' and ')}</b> turned back into ${ev.reverted.length>1?'polyps':'a polyp'}. Cool the tank and they will come back.</li>`);
+  if(ev.fed) lines.push(`<li>The auto feeder gave out ${ev.fed} ${plural(ev.fed,'portion')}.</li>`);
+  if(ev.sick) lines.push(`<li><b>${ev.sick}</b> got sick.</li>`);
+  const hungry=S.fish.filter(f=>f.hunger<35).length;
+  if(hungry) lines.push(`<li>${hungry} ${hungry>1?'are':'is'} hungry.</li>`);
+  lines.push(`<li>Water is ${pctW(100-S.waste)}% clean, filter at ${pctW(S.filter)}%, glass ${pctW(100-S.algae)}% clear.</li>`);
+  return `<div class="hd"><h3>Welcome back</h3><button class="x" data-act="close" aria-label="Close">×</button></div>
+    <p class="hint">${a.label}</p><ul class="tidy">${lines.join('')}</ul>
+    <button class="btn primary" data-act="close">Check on the tank</button>`;
+}
+function sheetSettings(){
+  return `<div class="hd"><h3 data-act="dev-tap">Settings</h3><button class="x" data-act="close" aria-label="Close">×</button></div>
+    <div class="kv"><h2 class="sec-title" style="margin:0">Saving</h2><p class="hint">${saveState.status}</p></div>
+    ${devOn?`<div class="kv"><h2 class="sec-title" style="margin:0">Developer</h2><p class="hint">Test tools. Time jumps forward on the spot.</p>
+    <div class="actions"><button class="btn" data-act="ff" data-m="60">+1 hour</button><button class="btn" data-act="ff" data-m="480">+8 hours</button><button class="btn" data-act="ff" data-m="1440">+1 day</button></div></div>`:''}
+    <div class="kv"><h2 class="sec-title" style="margin:0">Start over</h2>
+    <button class="btn ${sheetState.armed?'danger':''}" data-act="reset">${sheetState.armed?'Tap again to erase everything':'Erase this tank'}</button></div>`;
+}
+function sheetWelcome(){
+  return `<div class="hd"><h3>Your first tank</h3></div>
+    <ul class="tidy"><li>Your crew earns coins while you are away. Tap the <b>coin pile</b> on the sand (or Collect) to pick them up.</li>
+    <li>Tap <b>Feed</b> and watch them eat. Extra food sinks and dirties the water.</li>
+    <li>Change water and rinse the filter now and then. Hungry ones or dirty water make them sick, and medicine fixes that. Nobody dies.</li>
+    <li>Adults of the same species can breed. Shrimp and jellyfish are in the shop too, and jellies have a secret life cycle.</li></ul>
+    <button class="btn primary" data-act="close">Start</button>`;
+}
+function sheetNews(prev){
+  prev=prev||0;
+  const juice=`<li><b>Juicier tank:</b> coins fly into your counter, fish wiggle and squish when they eat or get tapped, and splashes, ripples and confetti pop up when something special happens.</li>
+    <li><b>Tap the water</b> to make a ripple. Friendly fish swim over to check it out.</li>
+    <li><b>Cleaning</b> is more fun too: the glass gets a real scrub and a water change swirls fresh water in.</li>`;
+  const v2=`<li><b>Hybrids:</b> pair two different species of the same kind. The babies are sterile, but worth more, and they get their own page in the Book.</li>
+    <li><b>Six new jellies:</b> Moon (flat saucer), Sea nettle (long streamers), Upside-down (flower on the sand), Comb (rainbow rows, lays eggs, no polyps), Immortal (tiny, turns back into a polyp instead of getting sick) and Box (fast, and other swimmers keep away).</li>
+    <li>Old Lantern jellies became Sea nettles.</li>`;
+  const v1=`<li><b>Coin pile:</b> earnings now collect on the sand. Tap the pile or the gold button.</li>
+    <li><b>Shrimp:</b> cherry, ghost and amano. They graze algae, molt, and mothers carry eggs.</li>
+    <li><b>Personalities:</b> each one is shy, bold, greedy, lazy, social or playful. Tap one to say hi.</li>
+    <li>The skip-ahead button is gone. Real time only now.</li>
+    <li><b>Jellyfish life cycle:</b> breed larvae, let them settle as polyps, then cool the tank to bud off baby jellies.</li>`;
+  return `<div class="hd"><h3>What is new</h3><button class="x" data-act="close" aria-label="Close">\u00d7</button></div>
+    <ul class="tidy">${juice}${prev<2?v2:''}${prev<1?v1:''}</ul>
+    <button class="btn primary" data-act="close">Nice</button>`;
+}
+function renderSheet(soft){
+  if(!sheetState) return;
+  const {kind,arg}=sheetState;
+  let html='';
+  if(kind==='fish'){const f=selFish(arg);if(!f){closeSheet();return;}html=sheetFish(f);}
+  else if(kind==='polyp'){const p=S.polyps.find(x=>x.id===arg);if(!p){closeSheet();return;}html=sheetPolyp(p);}
+  else if(kind==='pick') html=sheetPick(arg);
+  else if(kind==='decor') html=sheetDecor(arg);
+  else if(kind==='away') html=sheetAway(arg);
+  else if(kind==='settings') html=sheetSettings();
+  else if(kind==='welcome') html=sheetWelcome();
+  else if(kind==='news') html=sheetNews(arg);
+  const p=$('#sheetPanel');
+  const st=p.scrollTop;
+  p.innerHTML=html;
+  $('#sheet').hidden=false;
+  paintAllCanvases(p);
+  if(soft) p.scrollTop=st;
+}
+
+/* ---------- actions ---------- */
+function changed(){
+  refreshActive();
+  flushJuice();
+  markDirty();
+}
+function buyFish(id){
+  const sp=SP[id];
+  if(S.coins<sp.price){sfx.error();return toast('Not enough coins yet.');}
+  if(!hasRoom(id)){sfx.error();return toast(`No room. Space is ${fmtSpace(usedSpace())}/${capacity()}. Sell one or upgrade.`);}
+  sfx.buy();
+  S.coins-=sp.price;
+  const f=addFish(makeFish(id,founderGenes(sp.kind),STAGE_AGE[1]+30));
+  qJuice({kind:'arrive',id:f.id});
+  toast(`${f.name} the ${sp.n} joined your tank!`);
+  changed();
+}
+function breedToast(r,egg){
+  const n=r.n;
+  let t;
+  if(r.kind==='jelly'&&r.poly&&!r.direct) t=`${n} ${plural(n,'larva','larvae')} drifting off to settle. Polyps in ${r.total} minutes.`;
+  else if(r.kind==='shrimp'){
+    const car=egg&&egg.carrier?S.fish.find(f=>f.id===egg.carrier):null;
+    t=`${car?car.name+' is':'She is'} carrying ${n} eggs. They hatch in ${r.total} minutes.`;
+  }else t=`${n} eggs laid! They hatch in ${r.total} minutes.`;
+  return r.mixed?t+' Hybrids!':t;
+}
+function onAct(el){
+  const act=el.dataset.act,id=el.dataset.id;
+  switch(act){
+    case 'tab': sfx.tab();setTab(el.dataset.tab);break;
+    case 'collect': doCollect();break;
+    case 'feed': if(!S.fish.length){toast('Nobody to feed yet.');sfx.error();shake(el);} else if(!feedFlakes()){toast('Plenty of food in there already.');sfx.error();shake(el);} else sfx.feed();break;
+    case 'scrub': sfx.scrub();scrubFx();S.algae=0;toast('The glass is sparkling.');changed();break;
+    case 'water': sfx.water();swirlFx();S.waste=Math.max(3,S.waste*0.12);toast('Fresh water in.');changed();break;
+    case 'rinse': sfx.rinse();rinseFx();S.filter=100;toast('Filter rinsed.');changed();break;
+    case 'heat-up': S.heater=clamp(S.heater+1,16,32);changed();break;
+    case 'heat-dn': S.heater=clamp(S.heater-1,16,32);changed();break;
+    case 'heat-set': {
+      S.heater=clamp(+el.dataset.t,16,32);
+      toast(`Heater set to ${S.heater}°C.`);
+      changed();renderSheet(true);break;
+    }
+    case 'treat': {
+      let n=0;
+      for(const f of S.fish){if(f.sick&&S.meds>0){f.sick=false;f.health=70;S.meds--;n++;qJuice({kind:'heal',id:f.id});}}
+      if(n) sfx.heal(); else sfx.error();
+      toast(n?`Treated ${n}.`:'You are out of medicine. Buy some in the shop.');
+      changed();break;
+    }
+    case 'treat-one': {
+      const f=selFish(+id);
+      if(f&&S.meds>0){f.sick=false;f.health=70;S.meds--;sfx.heal();qJuice({kind:'heal',id:f.id});toast(`${f.name} is feeling better.`);}
+      else{sfx.error();toast('You are out of medicine. Buy some in the shop.');}
+      changed();renderSheet(true);break;
+    }
+    case 'decor-mode': toggleDecor(!scene.decorMode);break;
+    case 'fish': openSheet('fish',+id);break;
+    case 'polyp': openSheet('polyp',+id);break;
+    case 'polyp-remove': {
+      if(!sheetState.armed){sheetState.armed=true;renderSheet(true);break;}
+      S.polyps=S.polyps.filter(p=>p.id!==+id);
+      closeSheet();toast('Colony removed.');changed();break;
+    }
+    case 'close': closeSheet();break;
+    case 'sell': {
+      const f=selFish(+id);if(!f) break;
+      if(!sheetState.armed){sheetState.armed=true;renderSheet(true);break;}
+      const rc=el.getBoundingClientRect(),base=S.coins;
+      const p=sellFish(f);sfx.coin();
+      flyCoins(p,rc.left+rc.width/2,rc.top+rc.height/2,base);
+      breedSel.a=breedSel.a===f.id?null:breedSel.a;breedSel.b=breedSel.b===f.id?null:breedSel.b;
+      closeSheet();toast(`${f.name} went to a new home for ${p} coins.`);changed();break;
+    }
+    case 'pick-slot': openSheet('pick',el.dataset.which);break;
+    case 'pick-choose': {
+      const w=el.dataset.which;breedSel[w]=+id;
+      const o=w==='a'?'b':'a',of=selFish(breedSel[o]);
+      if(of&&kindOf(of)!==kindOf(selFish(+id))) breedSel[o]=null;
+      closeSheet();break;
+    }
+    case 'pick-clear': breedSel[el.dataset.which]=null;closeSheet();break;
+    case 'breed-go': {
+      const a=selFish(breedSel.a),b=selFish(breedSel.b);
+      if(pairBlock(a,b)) break;
+      const r=doBreed(a,b);sfx.breed();
+      const egg=S.eggs[S.eggs.length-1];
+      breedSel={a:null,b:null};
+      toast(breedToast(r,egg));
+      changed();renderTab('breed');break;
+    }
+    case 'book-kind': bookKind=el.dataset.kind;renderTab('book');break;
+    case 'buy-fish': buyFish(id);renderTab('shop');break;
+    case 'buy-decor': {
+      const d=DECOR[id];if(S.coins<d.price) break;
+      sfx.buy();S.coins-=d.price;S.decor.owned[id]=(S.decor.owned[id]||0)+1;
+      toast(`${d.n} bought. Place it with Decorate on the Tank tab.`);changed();renderTab('shop');break;
+    }
+    case 'place-decor': {
+      const i=+el.dataset.slot;S.decor.slots[i]=id||null;
+      closeSheet();changed();break;
+    }
+    case 'buy-tank': {
+      const t=TANKS[S.tankLvl+1];if(!t||S.coins<t.price) break;
+      sfx.buy();S.coins-=t.price;S.tankLvl++;toast(`Upgraded to the ${t.n}.`);changed();renderTab('shop');break;
+    }
+    case 'buy-filter': {
+      const t=FILTERS[S.filterLvl+1];if(!t||S.coins<t.price) break;
+      sfx.buy();S.coins-=t.price;S.filterLvl++;S.filter=100;toast(`${t.n} installed.`);changed();renderTab('shop');break;
+    }
+    case 'buy-feeder': if(S.coins<100) break;sfx.buy();S.coins-=100;S.feeder.owned=true;S.feeder.stock=6;toast('Auto feeder installed with 6 portions.');changed();renderTab('shop');break;
+    case 'refill': if(S.coins<12||S.feeder.stock>=12) break;sfx.buy();S.coins-=12;S.feeder.stock=Math.min(12,S.feeder.stock+6);toast('Feeder refilled.');changed();if(curTab!=='tank') renderTab(curTab);break;
+    case 'buy-med': if(S.coins<15) break;sfx.buy();S.coins-=15;S.meds++;toast('Medicine bought.');changed();renderTab('shop');break;
+    case 'buy-theme': {
+      const t=THEMES.find(x=>x.id===id);if(!t||S.coins<t.price) break;
+      sfx.buy();S.coins-=t.price;S.themes[id]=1;S.theme=id;toast(`${t.n} is now your backdrop.`);changed();renderTab('shop');break;
+    }
+    case 'use-theme': S.theme=id;changed();renderTab('shop');break;
+    case 'dev-tap': {
+      clearTimeout(devTimer);devTimer=setTimeout(()=>{devTaps=0;},1800);
+      devTaps++;
+      if(devTaps>=7&&!devOn){devOn=true;devTaps=0;toast('Developer tools on for this visit.');renderSheet(true);}
+      break;
+    }
+    case 'ff': if(devOn) advance(+el.dataset.m);break;
+    case 'reset': {
+      if(!sheetState.armed){sheetState.armed=true;renderSheet(true);break;}
+      try{localStorage.removeItem(SAVE_KEY);}catch(e){}
+      JUICE_ON=false;newGame();JUICE_Q.length=0;JUICE_ON=true;
+      breedSel={a:null,b:null};scene.rt.clear();scene.food.length=0;scene.parts.length=0;scene.ripples.length=0;
+      scene.vw=scene.va=scene.pileN=null;scene.wipe=scene.swirl=scene.rinse=null;
+      S.seenWelcome=true;S.news=NEWS_V;closeSheet();setTab('tank');snapCoins();changed();toast('Fresh tank, fresh start.');break;
+    }
+  }
+}
+function advance(mins){
+  mins=Math.min(mins,OFFLINE_CAP_MIN);
+  const ev=simulate(mins);
+  JUICE_Q.length=0;
+  lastSimAt=Date.now();
+  showAway(mins,ev);
+  changed();
+}
+function showAway(mins,ev){
+  sfx.chime();
+  openSheet('away',{ev,label:`You were away for ${fmtDur(mins)}.`});
+  if(curTab!=='tank') renderTab(curTab);
+}
+
+document.addEventListener('click',e=>{
+  const sh=$('#sheet');
+  if(e.target===sh){closeSheet();return;}
+  const el=e.target.closest('[data-act]');
+  if(el&&!el.disabled){
+    audioResume();
+    if(!OWN_SFX.has(el.dataset.act)) sfx.tap();
+    onAct(el);
+    popEl(el);
+  }else{
+    const b=e.target.closest('button');
+    if(b&&!b.disabled) popEl(b);
+  }
+});
+const OWN_SFX=new Set(['tab','feed','scrub','water','rinse','treat','treat-one','sell','breed-go','buy-fish','buy-decor','buy-tank','buy-filter','buy-feeder','refill','buy-med','buy-theme','collect','dev-tap']);
+$('#btnSound').addEventListener('click',()=>{
+  audioResume();
+  S.sound=!S.sound;
+  renderSoundBtn();
+  if(S.sound) sfx.chime();
+  markDirty();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sheetState) closeSheet();});
+$('#decorBtn').addEventListener('click',()=>toggleDecor(!scene.decorMode));
+$('#btnSettings').addEventListener('click',()=>openSheet('settings'));
+/* ================= saving ================= */
+const saveState={doc:null,status:'Saved on this device only.',busy:false,pending:false,allowed:false,timer:0};
+let lastSimAt=Date.now();
+
+function markDirty(){
+  clearTimeout(saveState.timer);
+  saveState.timer=setTimeout(saveNow,1500);
+}
+async function saveNow(){
+  if(!S||!saveState.allowed) return;
+  const json=serialize();
+  try{localStorage.setItem(SAVE_KEY,json);}catch(e){}
+  if(!saveState.doc) return;
+  if(saveState.busy){saveState.pending=true;return;}
+  saveState.busy=true;
+  try{
+    await saveState.doc.set({json,savedAt:S.savedAt});
+    saveState.status='Saved to your account and this device.';
+  }catch(e){
+    saveState.status='Saved on this device. The account save did not go through.';
+  }
+  saveState.busy=false;
+  if(saveState.pending){saveState.pending=false;saveNow();}
+}
+
+async function initRemote(){
+  try{
+    if(!window.claude||!window.claude.use) return null;
+    const res=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    const db=res[0],user=res[1];
+    if(!db||!user) return null;
+    const id=await user.id();
+    if(!id) return null;
+    const doc=db.doc('data/users/'+id+'/tank');
+    const snap=await doc.get();
+    let data=null;
+    if(snap.exists){
+      const d=snap.data();
+      if(d&&typeof d.json==='string'){try{data=JSON.parse(d.json);}catch(e){data=null;}}
+    }
+    return {doc,data};
+  }catch(e){return null;}
+}
+
+/* ================= boot ================= */
+function afterLoad(){
+  JUICE_ON=false;
+  const now=Date.now();
+  let mins=(now-S.lastSeen)/60000;
+  if(!(mins>0)) mins=0;
+  if(mins>OFFLINE_CAP_MIN) mins=OFFLINE_CAP_MIN;
+  lastSimAt=now;
+  scene.rt.clear();scene.food.length=0;
+  let ev=null;
+  if(mins>0.05) ev=simulate(mins);
+  S.lastSeen=now;
+  buildNav();
+  for(const f of S.fish) discover(f);
+  JUICE_Q.length=0;JUICE_ON=true;
+  scene.vw=scene.va=scene.pileN=null;
+  snapCoins();
+  setTab(curTab);
+  refreshActive();
+  if(ev&&mins>=5) showAway(mins,ev);
+  else if(!S.seenWelcome){S.seenWelcome=true;S.news=NEWS_V;openSheet('welcome');}
+  else if((S.news||0)<NEWS_V){const prev=S.news||0;S.news=NEWS_V;openSheet('news',prev);}
+}
+function tick(){
+  if(!S) return;
+  const now=Date.now();
+  let mins=(now-lastSimAt)/60000;
+  lastSimAt=now;
+  if(!(mins>0)) return;
+  if(mins>OFFLINE_CAP_MIN) mins=OFFLINE_CAP_MIN;
+  const hatchedBefore=S.stats.hatched;
+  const ev=simulate(mins);
+  if(mins>=5) JUICE_Q.length=0;
+  if(mins>=5&&!sheetState) showAway(mins,ev);
+  else{
+    if(ev.reverted&&ev.reverted.length){toast(`${ev.reverted[0]} turned back into a polyp! Cool the tank to bring it back.`);sfx.chime();}
+    else if(ev.released){toast(`${ev.released} baby ${ev.released>1?'jellies':'jelly'} budded off! Warm the tank back up when you are ready.`);sfx.hatch();}
+    else if(ev.settled){toast('A larva settled as a polyp colony.');sfx.hatch();}
+    else if(S.stats.hatched>hatchedBefore){toast(`${S.stats.hatched-hatchedBefore} new ${S.stats.hatched-hatchedBefore>1?'babies':'baby'} hatched!`);sfx.hatch();}
+    if(ev.sick){toast('Someone is feeling sick. Check the tank.');sfx.sick();}
+  }
+  refreshActive();
+  flushJuice();
+}
+function loadLocal(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw) return null;
+    const o=JSON.parse(raw);
+    return (o&&Array.isArray(o.fish))?o:null;
+  }catch(e){return null;}
+}
+async function start(){
+  sceneInit();
+  buildNav();
+  $('#tankHint').textContent='Filling the tank...';
+  const local=loadLocal();
+  let remote=null,remoteDone=false;
+  const rp=initRemote().then(r=>{remote=r;remoteDone=true;return r;});
+  await Promise.race([rp,new Promise(r=>setTimeout(r,2500))]);
+  let src=local;
+  if(remote){
+    saveState.doc=remote.doc;
+    saveState.status='Saved to your account and this device.';
+    if(remote.data&&(!local||(remote.data.savedAt||0)>(local.savedAt||0)+1000)) src=remote.data;
+  }
+  if(src&&Array.isArray(src.fish)) S=normalize(src); else newGame();
+  saveState.allowed=true;
+  afterLoad();
+  sceneStart();
+  setInterval(tick,2000);
+  setInterval(saveNow,45000);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){sceneStop();saveNow();try{if(SND.ctx&&SND.ctx.state==='running') SND.ctx.suspend();}catch(e){}}
+    else{sceneStart();tick();audioResume();}
+  });
+  window.addEventListener('pagehide',saveNow);
+  ['pointerdown','touchend','keydown'].forEach(n=>document.addEventListener(n,audioResume,{passive:true}));
+  if(!remoteDone){
+    rp.then(r=>{
+      if(!r) return;
+      saveState.doc=r.doc;
+      saveState.status='Saved to your account and this device.';
+      if(r.data&&(r.data.savedAt||0)>(S.savedAt||0)+1000){
+        S=normalize(r.data);afterLoad();toast('Loaded your saved tank.');
+      }else saveNow();
+    });
+  }
+}
+function boot(startFn){
+  try{
+    const h=window.claude&&window.claude.hot;
+    if(h&&h.ready) h.ready(()=>startFn());
+    else startFn();
+  }catch(e){startFn();}
+}
+boot(start);
+</script>

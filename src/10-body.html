@@ -1,0 +1,36 @@
+<div id="app">
+  <header class="top">
+    <div class="brand">Finlings<small>pocket aquarium</small></div>
+    <div class="coins" title="Coins"><span id="coinIc"></span><span id="coins">0</span></div>
+    <button class="iconbtn" id="btnSound" aria-label="Turn sound off"></button>
+    <button class="iconbtn" id="btnSettings" aria-label="Settings"></button>
+  </header>
+
+  <main id="main">
+    <section class="tab on" id="tab-tank" aria-label="Tank">
+      <div class="tankwrap"><canvas id="scene" width="160" height="120" aria-label="Your aquarium. Tap a fish to see its details."></canvas></div>
+      <div class="tankbar">
+        <span class="info" id="tankInfo"></span>
+        <button class="mini" id="decorBtn">Decorate</button>
+      </div>
+      <p class="hint" id="tankHint"></p>
+      <div class="actions" id="actions"></div>
+      <div class="meters card">
+        <div class="meter"><div class="row"><span>Water</span><b id="mWater"></b></div><div class="bar" id="bWater"><i></i></div></div>
+        <div class="meter"><div class="row"><span>Filter</span><b id="mFilter"></b></div><div class="bar" id="bFilter"><i></i></div></div>
+        <div class="meter"><div class="row"><span>Glass</span><b id="mGlass"></b></div><div class="bar" id="bGlass"><i></i></div></div>
+        <div class="meter"><div class="row"><span>Temp</span><b id="mTemp"></b></div><div class="tempnote" id="tTemp"></div></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-fish" aria-label="Crew"></section>
+    <section class="tab" id="tab-breed" aria-label="Breeding"></section>
+    <section class="tab" id="tab-shop" aria-label="Shop"></section>
+    <section class="tab" id="tab-book" aria-label="Collection book"></section>
+  </main>
+
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+</div>
+
+<div class="sheet" id="sheet" hidden><div class="panel" id="sheetPanel" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden></div>
