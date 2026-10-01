@@ -1,3 +1,7 @@
+# future plans
+
+this app was originaly made just for me but feel free to use it if you want. i plan on adding more features to the project and more species.
+
 # Finlings
 
 A cozy pixel-art pocket aquarium for your phone. Keep fish, shrimp and jellyfish, feed them, keep the water clean, breed new colors and hybrids, and fill your collection book.
