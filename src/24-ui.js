@@ -141,6 +141,7 @@ function buildNav(){
   const tabs=[['tank','Tank','tank'],['fish','Crew','fish'],['breed','Breed','heart'],['shop','Shop','bag'],['book','Book','book']];
   $('#tabs').innerHTML=tabs.map(([id,label,icon])=>`<button data-act="tab" data-tab="${id}" class="${id===curTab?'on':''}" aria-label="${label}">${ic(icon,2)}<span>${label}</span><i class="dot" id="dot-${id}"></i></button>`).join('');
   $('#coinIc').innerHTML=ic('coin',2);
+  $('#brandIc').innerHTML=ic('fish',2);
   $('#btnSettings').innerHTML=ic('gear',2);
   renderSoundBtn();
 }
@@ -208,28 +209,33 @@ function hintText(){
 function updateTankUI(){
   const T=TANKS[S.tankLvl];
   renderCoins();
-  $('#tankInfo').textContent=`${T.n} ${T.l} · space ${fmtSpace(usedSpace())}/${T.cap}`;
+  const used=usedSpace();
+  $('#tankInfo').innerHTML=`<span class="nm">${T.n}<small>${T.l}</small></span><span class="sp"><span class="bar ${barCls(100-100*used/T.cap,20,8)}"><i style="width:${pctW(100*used/T.cap)}%"></i></span>space ${fmtSpace(used)}/${T.cap}</span>`;
   $('#tankHint').textContent=hintText();
+  $('#tankHint').classList.toggle('warn',needsAttention());
   const water=100-S.waste,glass=100-S.algae;
-  const setBar=(id,pct,g,w)=>{const b=$('#'+id);b.className='bar '+barCls(pct,g,w);b.firstElementChild.style.width=pctW(pct)+'%';};
-  setBar('bWater',water,50,30);setBar('bFilter',S.filter,40,15);setBar('bGlass',glass,40,20);
+  const setBar=(id,pct,g,w)=>{const b=$('#b'+id),c=barCls(pct,g,w);b.className='bar '+c;b.firstElementChild.style.width=pctW(pct)+'%';$('#me'+id).className='meter '+c;};
+  setBar('Water',water,50,30);setBar('Filter',S.filter,40,15);setBar('Glass',glass,40,20);
+  $('#gTemp').querySelector('.cur').style.left=pctW(100*(S.temp-16)/16)+'%';
+  $('#gTemp').querySelector('.tgt').style.left=pctW(100*(S.heater-16)/16)+'%';
   $('#mWater').textContent=pctW(water)+'%';
   $('#mFilter').textContent=pctW(S.filter)+'%';
   $('#mGlass').textContent=pctW(glass)+'%';
   $('#mTemp').textContent=S.temp.toFixed(1)+'°C';
   const comfy=S.fish.filter(f=>tempOff(f)<=0.5).length;
-  $('#tTemp').textContent=!S.fish.length?'Nobody here yet':(Math.abs(S.temp-S.heater)>0.4?`Heating to ${S.heater}°`:`${comfy}/${S.fish.length} comfy`);
+  const warming=Math.abs(S.temp-S.heater)>0.4;
+  $('#tTemp').textContent=`Heater ${S.heater}°`+(warming?(S.temp<S.heater?' · warming up':' · cooling down'):(S.fish.length?` · ${comfy}/${S.fish.length} comfy`:''));
   const sick=sickCount();
   const n=Math.floor(S.pile);
+  const extra=(sick&&S.feeder.owned)?'s6':'s12';
   const html=[
     `<button class="btn gold wide" data-act="collect" ${n<1?'disabled':''}>${ic('coin',2)}${n<1?'Coin pile is empty':'Collect '+n+' '+plural(n,'coin')}</button>`,
-    `<button class="btn primary" data-act="feed">${ic('food',2)}Feed</button>`,
-    `<button class="btn" data-act="scrub" ${S.algae<3?'disabled':''}>${ic('scrub',2)}Scrub glass</button>`,
-    `<button class="btn" data-act="water" ${S.waste<6?'disabled':''}>${ic('drop',2)}Change water</button>`,
-    `<button class="btn" data-act="rinse" ${S.filter>95?'disabled':''}>${ic('filter',2)}Rinse filter</button>`,
-    sick?`<button class="btn danger two" data-act="treat"><span class="lbl">${ic('pill',2)}Treat ${sick}</span><small>${S.meds} medicine</small></button>`:'',
-    `<div class="stepper"><button data-act="heat-dn" aria-label="Lower heater">−</button><div class="val">${S.heater}°C<small>Heater</small></div><button data-act="heat-up" aria-label="Raise heater">+</button></div>`,
-    S.feeder.owned?`<button class="btn two" data-act="refill" ${S.feeder.stock>=12||S.coins<12?'disabled':''}><span class="lbl">${ic('food',2)}Refill feeder</span><small>${S.feeder.stock}/12 · 12 coins</small></button>`:''
+    `<button class="btn primary tile s3" data-act="feed" aria-label="Feed the fish"><span class="tic">${ic('food',3)}</span>Feed</button>`,
+    `<button class="btn tile s3" data-act="scrub" aria-label="Scrub the glass" ${S.algae<3?'disabled':''}><span class="tic">${ic('scrub',3)}</span>Scrub</button>`,
+    `<button class="btn tile s3" data-act="water" aria-label="Change the water" ${S.waste<6?'disabled':''}><span class="tic">${ic('drop',3)}</span>Water</button>`,
+    `<button class="btn tile s3" data-act="rinse" aria-label="Rinse the filter" ${S.filter>95?'disabled':''}><span class="tic">${ic('filter',3)}</span>Rinse</button>`,
+    sick?`<button class="btn danger two ${extra}" data-act="treat"><span class="lbl">${ic('pill',2)}Treat ${sick}</span><small>${S.meds} medicine</small></button>`:'',
+    S.feeder.owned?`<button class="btn two ${extra}" data-act="refill" ${S.feeder.stock>=12||S.coins<12?'disabled':''}><span class="lbl">${ic('food',2)}Refill feeder</span><small>${S.feeder.stock}/12 · 12 coins</small></button>`:''
   ].join('');
   if(html!==lastActions){$('#actions').innerHTML=html;lastActions=html;}
   $('#decorBtn').classList.toggle('on',scene.decorMode);
@@ -313,7 +319,7 @@ function eggHtml(e){
 function htmlBreed(){
   let a=selFish(breedSel.a),b=selFish(breedSel.b);
   if(!a) breedSel.a=null; if(!b) breedSel.b=null;
-  const slot=(f,which)=>`<div class="card slot" >${f?`<button class="fcard" style="width:100%" data-act="pick-slot" data-which="${which}"><div class="pic"><canvas data-fish="${f.id}" width="64" height="54"></canvas></div><div class="nm">${f.name}</div><div class="sub">${speciesLabel(f)}</div></button>`:`<button class="btn" data-act="pick-slot" data-which="${which}" style="width:100%;min-height:120px">${ic('plus',3)}Pick ${which==='a'?'first':'second'}</button>`}</div>`;
+  const slot=(f,which)=>`<div class="card slot ${f?'filled':''}">${f?`<button class="fcard" style="width:100%" data-act="pick-slot" data-which="${which}"><div class="pic"><canvas data-fish="${f.id}" width="64" height="54"></canvas></div><div class="nm">${f.name}</div><div class="sub">${speciesLabel(f)}</div></button>`:`<button class="slotbtn" data-act="pick-slot" data-which="${which}"><span class="plus">${ic('plus',2)}</span>Pick ${which==='a'?'first':'second'}</button>`}</div>`;
   const block=pairBlock(a,b);
   const kind=a?kindOf(a):(b?kindOf(b):'fish');
   const same=a&&b&&kindOf(a)===kindOf(b),mixed=same&&a.sp!==b.sp;
@@ -341,12 +347,12 @@ function htmlBreed(){
   }
   how.push(`Only adults can breed, and parents rest for ${fmtDur(COOLDOWN_MIN)} afterwards.`);
   return `<h2 class="sec-title">Pick a pair</h2>
-    <div class="pair">${slot(a,'a')}${slot(b,'b')}</div>
+    <div class="pair">${slot(a,'a')}${slot(b,'b')}<span class="pair-heart" aria-hidden="true">${ic('heart',2)}</span></div>
     ${pred}
-    <button class="btn primary" data-act="breed-go" ${block?'disabled':''}>${ic('heart',2)}${block||'Pair them up'}</button>
-    <p class="hint">${how.join(' ')}</p>
+    <button class="btn primary big" data-act="breed-go" ${block?'disabled':''}>${ic('heart',2)}${block||'Pair them up'}</button>
+    <p class="tip">${how.join(' ')}</p>
     <h2 class="sec-title">Nursery · ${S.eggs.length}/${NURSERY_MAX}</h2>
-    ${eggs||'<p class="hint">Nothing growing right now.</p>'}`;
+    ${eggs||'<p class="hint empty">Nothing growing right now.</p>'}`;
 }
 
 /* ---------- shop tab ---------- */
@@ -355,12 +361,12 @@ function shopRow(sp){
   const bits=[`${sp.lo}–${sp.hi}°C`];
   const quirk=sp.quirk?`<span style="color:var(--accent)">${sp.quirk}</span>`:'';
   if(sp.algae) bits.push('eats algae');
-  if(sp.sens) bits.push('needs very clean water');
-  bits.push(`uses ${fmtSpace(sp.w)} space`);
+  if(sp.sens) bits.push('very clean water');
+  bits.push(`${fmtSpace(sp.w)} space`);
   return `<div class="card shop-item">
       <div class="pic"><canvas data-species="${sp.id}" width="64" height="54"></canvas></div>
-      <div class="txt"><b>${sp.n}</b><span>${sp.blurb}</span>${quirk}<span>${bits.join(' · ')}</span></div>
-      <button class="btn buy" data-act="buy-fish" data-id="${sp.id}" ${(broke||!room)?'disabled':''}>${!room?'No room':'Buy'}${coinHtml(sp.price)}</button>
+      <div class="txt"><b>${sp.n}</b><span>${sp.blurb}</span>${quirk}<div class="chips">${bits.map(b=>`<span class="chip">${b}</span>`).join('')}</div></div>
+      <div class="buyrow"><span class="${broke?'broke':''}">${coinHtml(sp.price)}</span><button class="btn buy" data-act="buy-fish" data-id="${sp.id}" ${(broke||!room)?'disabled':''}>${!room?'No room':'Buy'}</button></div>
     </div>`;
 }
 function htmlShop(){
