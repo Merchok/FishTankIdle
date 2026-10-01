@@ -1,6 +1,6 @@
 <div id="app">
   <header class="top">
-    <div class="brand">Finlings<small>pocket aquarium</small></div>
+    <div class="brand"><span class="logo" id="brandIc" aria-hidden="true"></span><span class="wm">Finlings</span><small>pocket aquarium</small></div>
     <div class="coins" title="Coins"><span id="coinIc"></span><span id="coins">0</span></div>
     <button class="iconbtn" id="btnSound" aria-label="Turn sound off"></button>
     <button class="iconbtn" id="btnSettings" aria-label="Settings"></button>
@@ -8,18 +8,27 @@
 
   <main id="main">
     <section class="tab on" id="tab-tank" aria-label="Tank">
-      <div class="tankwrap"><canvas id="scene" width="160" height="120" aria-label="Your aquarium. Tap a fish to see its details."></canvas></div>
-      <div class="tankbar">
-        <span class="info" id="tankInfo"></span>
-        <button class="mini" id="decorBtn">Decorate</button>
+      <div class="tankunit">
+        <div class="tankwrap"><canvas id="scene" width="160" height="120" aria-label="Your aquarium. Tap a fish to see its details."></canvas></div>
+        <div class="tankbar">
+          <div class="info" id="tankInfo"></div>
+          <button class="mini" id="decorBtn">Decorate</button>
+        </div>
       </div>
-      <p class="hint" id="tankHint"></p>
-      <div class="actions" id="actions"></div>
+      <p class="tip" id="tankHint"></p>
+      <div class="actions home" id="actions"></div>
       <div class="meters card">
-        <div class="meter"><div class="row"><span>Water</span><b id="mWater"></b></div><div class="bar" id="bWater"><i></i></div></div>
-        <div class="meter"><div class="row"><span>Filter</span><b id="mFilter"></b></div><div class="bar" id="bFilter"><i></i></div></div>
-        <div class="meter"><div class="row"><span>Glass</span><b id="mGlass"></b></div><div class="bar" id="bGlass"><i></i></div></div>
-        <div class="meter"><div class="row"><span>Temp</span><b id="mTemp"></b></div><div class="tempnote" id="tTemp"></div></div>
+        <div class="meter" id="meWater"><div class="row"><span>Water</span><b id="mWater"></b></div><div class="bar" id="bWater"><i></i></div></div>
+        <div class="meter" id="meFilter"><div class="row"><span>Filter</span><b id="mFilter"></b></div><div class="bar" id="bFilter"><i></i></div></div>
+        <div class="meter" id="meGlass"><div class="row"><span>Glass</span><b id="mGlass"></b></div><div class="bar" id="bGlass"><i></i></div></div>
+        <div class="meter thermo">
+          <div class="row"><span>Temp</span><span class="tempnote" id="tTemp"></span><b id="mTemp"></b></div>
+          <div class="trow">
+            <button class="tbtn" data-act="heat-dn" aria-label="Lower heater">&minus;</button>
+            <div class="gauge" id="gTemp"><i class="tgt"></i><i class="cur"></i></div>
+            <button class="tbtn" data-act="heat-up" aria-label="Raise heater">+</button>
+          </div>
+        </div>
       </div>
     </section>
 
