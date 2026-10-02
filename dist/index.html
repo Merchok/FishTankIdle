@@ -1373,7 +1373,8 @@ const DRAW={
 
 function sceneInit(){
   scene.cv=$('#scene');scene.c=scene.cv.getContext('2d');scene.c.imageSmoothingEnabled=false;
-  scene.cv.addEventListener('pointerdown',onScenePointer);
+  // Open sheets after the completed tap, so its trailing click cannot hit the new backdrop.
+  scene.cv.addEventListener('click',onScenePointer);
 }
 function floorY(f,s){return SAND_Y+3-s.feet+s.h/2;}
 function rtFor(f){

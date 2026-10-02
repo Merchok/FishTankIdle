@@ -523,6 +523,33 @@ async def priorities(page):
       arg:sheetState?.arg??null,greeting:!!testRuntime().greeting,events:testDecorEvents})""")
     check('decoration-slot taps still open decoration controls',
           result['kind'] == 'decor' and result['arg'] == 2 and not result['greeting'], result)
+    await page.locator('#sheetPanel').get_by_role('button', name='Close', exact=True).tap()
+    check('explicit touch on Close dismisses decoration controls',
+          await page.evaluate("!sheetState && $('#sheet').hidden"))
+    await tap(page, 80, 108)
+    check('another decoration tap reopens the same slot without closing it',
+          await page.evaluate("sheetState?.kind==='decor' && sheetState.arg===2 && !testRuntime().greeting"))
+    await page.locator('#sheet').tap(position={'x': 8, 'y': 8})
+    check('intentional backdrop touch dismisses decoration controls without click-through',
+          await page.evaluate("!sheetState && $('#sheet').hidden && !testRuntime().greeting"))
+
+    await page.evaluate('toggleDecor(false)')
+    await tap(page, 55, 45)
+    check('direct creature touch still opens details after decoration dismissal',
+          await page.evaluate("sheetState?.kind==='fish' && sheetState.arg===testFish().id"))
+    await page.locator('#sheetPanel').get_by_role('button', name='Close', exact=True).tap()
+    await tap(page, 95, 45)
+    check('empty-glass touch still starts a response after detail dismissal',
+          await page.evaluate('!sheetState && !!testRuntime().greeting'))
+
+    await reset(page, fish=[])
+    await page.evaluate("S.polyps.push(newPolyp('moon',founderGenes('jelly')));drawScene()")
+    await tap(page, 18, 116)
+    check('direct polyp touch opens and preserves its detail sheet',
+          await page.evaluate("sheetState?.kind==='polyp' && sheetState.arg===S.polyps[0].id"))
+    await page.locator('#sheetPanel').get_by_role('button', name='Close', exact=True).tap()
+    check('explicit touch on Close dismisses polyp details',
+          await page.evaluate("!sheetState && $('#sheet').hidden"))
 
 
 async def reduced_motion(browser, errors):

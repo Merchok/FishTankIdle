@@ -1,7 +1,7 @@
 /* Finlings service worker: saves the game on the device so it opens with no internet.
    Online: you always get the newest version. Offline (or very slow): the saved copy.
-   440504539 is replaced by build.sh, so every new build refreshes the saved copy. */
-const CACHE = 'finlings-440504539';
+   2597087000 is replaced by build.sh, so every new build refreshes the saved copy. */
+const CACHE = 'finlings-2597087000';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
