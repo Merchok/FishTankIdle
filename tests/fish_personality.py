@@ -512,10 +512,17 @@ async def priorities(page):
           await page.evaluate('S.fish.every(f=>!rtFor(f).greeting)'))
 
     await reset(page)
-    await page.evaluate('scene.decorMode=true')
+    await page.evaluate("""() => {
+      scene.decorMode=true;window.testDecorEvents=[];
+      for(const type of ['pointerdown','pointerup','click'])
+        document.addEventListener(type,e=>testDecorEvents.push({type,target:e.target.id,
+          kind:sheetState?.kind??null,arg:sheetState?.arg??null}),{once:true});
+    }""")
     await tap(page, 80, 108)
+    result = await page.evaluate("""() => ({kind:sheetState?.kind??null,
+      arg:sheetState?.arg??null,greeting:!!testRuntime().greeting,events:testDecorEvents})""")
     check('decoration-slot taps still open decoration controls',
-          await page.evaluate("sheetState?.kind==='decor' && sheetState.arg===2 && !testRuntime().greeting"))
+          result['kind'] == 'decor' and result['arg'] == 2 and not result['greeting'], result)
 
 
 async def reduced_motion(browser, errors):
@@ -581,7 +588,13 @@ async def screenshot_fixture(page):
         {'trait': 'shy', 'sp': 'cherry', 'x': 69, 'fish': {'name': 'Cherry'}},
         {'trait': 'lazy', 'sp': 'moon', 'x': 124, 'y': 32, 'fish': {'name': 'Moon'}},
     ])
-    await page.evaluate('snapCoins();renderSoundBtn()')
+    await page.evaluate("""() => {
+      // addFish queues arrivals/discoveries; they are not part of this settled tank.
+      JUICE_Q.length=0;
+      for(const key of ['parts','ripples','fx']) scene[key].length=0;
+      for(const r of scene.rt.values()) r.sq=0;
+      snapCoins();renderSoundBtn();drawScene();
+    }""")
     check('screenshot tank contains fish, shrimp, and jellyfish',
           await page.evaluate("['fish','shrimp','jelly'].every(kind=>S.fish.some(f=>kindOf(f)===kind && scene.rt.has(f.id)))"))
 
@@ -618,9 +631,14 @@ async def screenshots(page):
           openSheet('fish',S.fish.find(f=>kindOf(f)===kind).id);
           $('#sheetPanel').scrollTop=0;
         }""", kind)
-        text = await page.inner_text('#sheetPanel')
+        # innerText includes CSS text-transform: uppercase on the habit labels.
+        text = (await page.inner_text('#sheetPanel')).casefold()
         check(kind + ' details explain the favorite place and glass response',
-              label in text and 'Say hello' in text)
+              label.casefold() in text and 'say hello' in text)
+        # The sheet has its own scroller. Keep the complete greeting row and the
+        # favorite row immediately above it visible, even below the first fold.
+        await page.locator('#sheetPanel .r').filter(
+            has=page.get_by_text('Say hello', exact=True)).scroll_into_view_if_needed()
         await capture(page, filename)
         await page.locator('#sheetPanel').get_by_role('button', name='Close', exact=True).click()
         check(kind + ' detail sheet closes', await page.locator('#sheet').is_hidden())
