@@ -398,9 +398,62 @@ function nearestFlake(r,floorOnly,maxD){
 }
 function traitSpeed(tr){return tr==='lazy'?0.7:(tr==='bold'?1.15:(tr==='playful'?1.1:(tr==='shy'?0.9:1)));}
 
+/* Glass greetings are deliberately temporary and throttled. Food, rest and health
+   always win; nothing here changes hunger, happiness or income. */
+function reactToGlass(x,y){
+  if(y<0||y>SAND_Y||scene.decorMode) return;
+  const room=3-S.fish.filter(f=>scene.rt.get(f.id)?.greeting).length;
+  if(room<=0) return;
+  const nearby=S.fish.filter(f=>{
+    const r=scene.rt.get(f.id);
+    return kindOf(f)==='fish'&&r&&!r.greeting&&r.flee<=0&&!f.sick&&!r.sleep&&dayLight()>=0.4&&
+      !(scene.food.length&&f.hunger<(f.trait==='greedy'?98:92))&&
+      scene.t>=(r.greetAfter||0)&&Math.hypot(r.x-x,r.y-y)<(f.trait==='shy'?52:90);
+  }).sort((a,b)=>{
+    const ar=scene.rt.get(a.id),br=scene.rt.get(b.id);
+    return Math.hypot(ar.x-x,ar.y-y)-Math.hypot(br.x-x,br.y-y);
+  }).slice(0,room);
+  nearby.forEach((f,i)=>{
+    const r=scene.rt.get(f.id),shy=f.trait==='shy';
+    r.greetAfter=scene.t+12;r.wait=0;r.chase=0;r.nibble=false;r.atHome=false;r.visitingHome=false;
+    const dx=r.x-x,dy=r.y-y,d=Math.hypot(dx,dy)||1;
+    r.greeting={phase:shy?'retreat':f.trait==='lazy'?'watch':'approach',t:0,
+      x:clamp(x+(i-1)*9,10,150),y:clamp(y+(i%2?6:-4),14,SAND_Y-10),
+      awayX:clamp(r.x+(dx?dx/d:(r.x<80?1:-1))*24,10,150),
+      awayY:clamp(r.y+dy/d*18,14,SAND_Y-10)};
+  });
+}
+function moveGreeting(f,r,dt,speed){
+  const g=r.greeting;if(!g) return false;
+  g.t+=dt;
+  if(g.phase==='watch'||g.phase==='linger'){
+    if(Math.abs(g.x-r.x)>2) r.dir=g.x<r.x?-1:1;
+    if(g.t>(f.trait==='greedy'?0.8:2.4)){r.greeting=null;r.wait=0;r.tx=r.x;r.ty=r.y;}
+    return true;
+  }
+  const retreat=g.phase==='retreat';
+  const tx=retreat?g.awayX:g.x,ty=retreat?g.awayY:g.y;
+  const dx=tx-r.x,dy=ty-r.y,d=Math.hypot(dx,dy);
+  const pace=retreat?(REDUCED?0.8:1.3):(f.trait==='shy'?0.5:f.trait==='playful'?1.05:0.85);
+  if(!retreat&&g.approachLimit===undefined) g.approachLimit=clamp(d/Math.max(1,speed*pace)+2,8,18);
+  const step=Math.min(d,speed*pace*dt);
+  if(d>0){r.x+=dx/d*step;r.y+=dy/d*step;}
+  if(Math.abs(dx)>2){const dir=dx<0?-1:1;if(dir!==r.dir){r.dir=dir;r.turn=REDUCED?0:0.2;}}
+  if(retreat&&g.t>=1.8){g.phase='approach';g.t=0;}
+  else if(!retreat&&(d<3||g.t>g.approachLimit)){
+    if(d<3){g.phase='linger';g.t=0;if(!REDUCED) addFx('heart',r.x,r.y-6);}
+    else{r.greeting=null;r.tx=r.x;r.ty=r.y;}
+  }
+  return true;
+}
+
 function pickFishTarget(f,r,sp,st,night){
   const tr=f.trait,plants=plantXs();
-  r.nibble=false;
+  r.nibble=false;r.visitingHome=false;
+  const home=kindOf(f)==='fish'?ensureFavoritePlace(f):null;
+  if(home&&(night>0.6||Math.random()<(tr==='shy'||tr==='lazy'?0.65:0.35))){
+    r.chase=0;r.visitingHome=true;r.tx=home.x+rnd(-3,3);r.ty=home.y+rnd(-2,2);return;
+  }
   if(r.chase){
     const o=S.fish.find(x=>x.id===r.chase),orr=o&&scene.rt.get(o.id);
     if(orr&&r.chaseT>0){r.tx=orr.x;r.ty=orr.y;return;}
@@ -424,6 +477,7 @@ function pickFishTarget(f,r,sp,st,night){
 }
 function moveFish(f,r,sp,st,night,dt,speed,hungryFood){
   if(hungryFood){
+    r.atHome=false;r.visitingHome=false;
     const fl=nearestFlake(r,false);
     if(fl){r.tx=fl.x;r.ty=fl.y;speed*=1.7;r.wait=0;r.chase=0;}
   }
@@ -438,10 +492,12 @@ function moveFish(f,r,sp,st,night,dt,speed,hungryFood){
   if(r.wait>0){r.wait-=dt;return;}
   const dx=r.tx-r.x,dy=r.ty-r.y,d=Math.hypot(dx,dy);
   if(d<2.5){
-    r.wait=rnd(0.3,2.4)*(f.trait==='lazy'?2.2:1)*(r.nibble?2.5:1);
+    r.atHome=!!r.visitingHome;
+    r.wait=r.atHome?rnd(3,6)*(f.trait==='lazy'?1.5:1):rnd(0.3,2.4)*(f.trait==='lazy'?2.2:1)*(r.nibble?2.5:1);
     if(r.nibble) S.algae=Math.max(0,S.algae-1.2);
     pickFishTarget(f,r,sp,st,night);
   }else{
+    r.atHome=false;
     const s=Math.min(d,speed*dt);
     r.x+=dx/d*s;r.y+=dy/d*s;
     if(Math.abs(dx)>3){const nd=dx<0?-1:1;if(nd!==r.dir){r.dir=nd;r.turn=0.2;}}
@@ -521,7 +577,13 @@ function updateScene(dt){
     if(r.sleep) speed*=0.35;
     if(r.flee>0) speed*=2.4;
     if(kind==='jelly') r.pp=(r.pp+dt*0.4*(sp.pulse||1))%1;
-    if(kind==='fish'||sp.glide) moveFish(f,r,sp,st,night,dt,speed,hungryFood);
+    if(r.greeting&&(hungryFood||r.sleep||f.sick||r.flee>0)){
+      r.greeting=null;r.wait=0;
+      if(r.flee<=0){r.tx=r.x;r.ty=r.y;}
+    }
+    if(kind==='fish') ensureFavoritePlace(f);
+    if(r.greeting&&moveGreeting(f,r,dt,speed)){}
+    else if(kind==='fish'||sp.glide) moveFish(f,r,sp,st,night,dt,speed,hungryFood);
     else if(kind==='shrimp') moveShrimp(f,r,sp,st,night,dt,speed,hungryFood,s);
     else moveJelly(f,r,sp,st,night,dt,speed,hungryFood,s);
     r.x=clamp(r.x,6,154);
@@ -750,11 +812,10 @@ function onScenePointer(e){
     audioResume();sfx.fish();
     const rt=scene.rt.get(hit.id);
     if(rt){
-      rt.shim=0.7;rt.sq=0.4;
+      rt.shim=REDUCED?0:0.7;rt.sq=REDUCED?0:0.4;
       ripple(rt.x,rt.y,9);
-      if(hit.trait==='shy'){rt.flee=1.4;}
-      else if(hit.trait==='lazy'){addFx('z',rt.x,rt.y-8);}
-      else addFx('heart',rt.x,rt.y-6);
+      if(!REDUCED&&hit.trait==='lazy') addFx('z',rt.x,rt.y-8);
+      else if(!REDUCED&&hit.trait!=='shy') addFx('heart',rt.x,rt.y-6);
     }
     openSheet('fish',hit.id);
   }else waterTap(x,y);

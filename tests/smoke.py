@@ -4,7 +4,7 @@
     bash build.sh
     python tests/smoke.py
 """
-import asyncio, pathlib, sys
+import asyncio, os, pathlib, shutil, sys
 from playwright.async_api import async_playwright
 
 PAGE = (pathlib.Path(__file__).resolve().parent.parent / 'dist' / 'index.html').as_uri()
@@ -22,7 +22,10 @@ async def main():
         if not ok: problems.append(name)
 
     async with async_playwright() as p:
-        b = await p.chromium.launch()
+        executable = os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE')
+        if not executable and not pathlib.Path(p.chromium.executable_path).exists():
+            executable = shutil.which('chromium') or shutil.which('chromium-browser')
+        b = await p.chromium.launch(**({'executable_path': executable} if executable else {}))
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
         page = await ctx.new_page()
         errs = []

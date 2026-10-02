@@ -204,7 +204,7 @@ function hintText(){
   if(!S.fish.length) return 'Your tank is empty. Visit the shop to get your first fish.';
   if(S.polyps.some(p=>p.size>=2)) return 'Your polyps are ready. Open one on the Crew tab to see how to wake them.';
   const inc=S.fish.reduce((a,f)=>a+incomePerHour(f),0);
-  return `All calm. Your crew earns about ${Math.round(inc)} coins an hour.`;
+  return `All calm. Tap an empty spot on the glass to say hello. Your crew earns about ${Math.round(inc)} coins an hour.`;
 }
 function updateTankUI(){
   const T=TANKS[S.tankLvl];
@@ -519,6 +519,8 @@ function sheetFish(f){
       <div class="r"><span>Health</span><div class="bar ${barCls(f.health,60,35)}"><i style="width:${pctW(f.health)}%"></i></div></div>
       <div class="r"><span>Nature</span><div class="hint"><b style="color:var(--fg)">${tr.n}.</b> ${tr.d}</div></div>
       ${f.hyb?`<div class="r"><span>Hybrid</span><div class="hint">Sterile, but worth more.</div></div>`:(sp.quirk?`<div class="r"><span>Quirk</span><div class="hint">${sp.quirk}</div></div>`:'')}
+      ${kind==='fish'?`<div class="r"><span>Favorite spot</span><div class="hint">${favoritePlaceLabel(f)}. A place to wander back to.</div></div>
+      <div class="r"><span>Say hello</span><div class="hint">${{shy:'Hangs back at first, then comes closer slowly.',bold:'Swims over to see you.',greedy:'Checks for a snack, then goes exploring.',lazy:'Watches you from a comfy distance.',social:'Comes close and stays a little while.',playful:'Eager to come over and investigate.'}[f.trait]} Tap empty glass to watch.</div></div>`:''}
       <div class="r"><span>Likes</span><div class="hint">${rangeOf(f).lo}–${rangeOf(f).hi}°C${sp.sens?' · very clean water':''}</div></div>
       <div class="r"><span>Worth</span><div>${coinHtml(fishValue(f))}</div></div>
       <div class="r"><span>Earns</span><div class="hint">${inc>0?inc.toFixed(1)+' coins an hour':(st<1?'Starts when it is a juvenile':'Nothing while hungry or sick')}</div></div>

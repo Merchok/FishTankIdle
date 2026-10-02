@@ -5,7 +5,7 @@ service worker save the game, then STOPS the server and checks the game still op
     bash build.sh
     python tests/offline.py
 """
-import asyncio, json, pathlib, shutil, subprocess, sys, tempfile, time, urllib.request
+import asyncio, json, os, pathlib, shutil, subprocess, sys, tempfile, time, urllib.request
 from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -30,7 +30,11 @@ async def main():
     shutil.copytree(ROOT / 'dist', site / 'FishTankIdle')     # same sub-path layout as GitHub Pages
     server = serve(site)
     async with async_playwright() as p:
-        b = await p.chromium.launch()
+        executable = os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE')
+        if not executable and not pathlib.Path(p.chromium.executable_path).exists():
+            executable = shutil.which('chromium') or shutil.which('chromium-browser')
+        launch_options = {'executable_path': executable} if executable else {}
+        b = await p.chromium.launch(**launch_options)
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
         page = await ctx.new_page()
         errs, outside = [], set()
@@ -98,7 +102,7 @@ async def main():
 
         # ---- update flow: a new build replaces the old offline copy ----
         server = serve(site)
-        b = await p.chromium.launch()
+        b = await p.chromium.launch(**launch_options)
         ctx = await b.new_context()
         page = await ctx.new_page()
         await page.goto(BASE); await page.wait_for_timeout(1500)
