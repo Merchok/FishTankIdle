@@ -1,0 +1,53 @@
+name: Browser checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Build exact PR head
+        run: |
+          git rev-parse HEAD
+          bash build.sh
+          node tests/fish_personality_unit.js
+      - name: Smoke test
+        run: python tests/smoke.py
+      - name: Offline and backup test
+        if: ${{ !cancelled() }}
+        run: python tests/offline.py
+      - name: Habits and visual regression test
+        if: ${{ !cancelled() }}
+        run: python tests/fish_personality.py
+      - name: Save synthetic aquarium screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-screenshots-${{ github.event.pull_request.head.sha }}
+          path: tests/fish-personality-*.png
+          if-no-files-found: error
+          retention-days: 7

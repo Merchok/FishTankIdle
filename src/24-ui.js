@@ -204,7 +204,7 @@ function hintText(){
   if(!S.fish.length) return 'Your tank is empty. Visit the shop to get your first fish.';
   if(S.polyps.some(p=>p.size>=2)) return 'Your polyps are ready. Open one on the Crew tab to see how to wake them.';
   const inc=S.fish.reduce((a,f)=>a+incomePerHour(f),0);
-  return `All calm. Your crew earns about ${Math.round(inc)} coins an hour.`;
+  return `All calm. Tap an empty spot on the glass to say hello. Your crew earns about ${Math.round(inc)} coins an hour.`;
 }
 function updateTankUI(){
   const T=TANKS[S.tankLvl];
@@ -508,6 +508,23 @@ function hxTick(now){
   hxRaf=requestAnimationFrame(hxTick);
 }
 function hxStart(){if(!hxRaf&&!REDUCED&&document.querySelector('.hx-svg')) hxRaf=requestAnimationFrame(hxTick);}
+function creatureHabits(f){
+  const kind=kindOf(f),floor=SP[f.sp].floor;
+  const place=kind==='jelly'?preferredDepthLabel(f):favoritePlaceLabel(f);
+  const greeting=kind==='fish'?{
+    shy:'Hangs back at first, then comes closer slowly.',bold:'Swims over to see you.',
+    greedy:'Checks for a snack, then goes exploring.',lazy:'Watches you from a comfy distance.',
+    social:'Comes close and stays a little while.',playful:'Eager to come over and investigate.'
+  }[f.trait]:kind==='shrimp'?{
+    shy:'Freezes, takes a small step back, then cautiously returns.',bold:'Pauses, steps aside and soon resumes exploring.',
+    greedy:'Pauses briefly, then gets back to foraging.',lazy:'Stays still a little longer before carrying on.',
+    social:'Pauses and steps aside, then returns to its little patch.',playful:'Takes a quick little step back, then slowly comes back.'
+  }[f.trait]:floor?'Keeps resting on the sand, with a gentle change of pulse.':
+    f.trait==='shy'?'Gently turns away, then returns to its favorite depth.':
+    f.trait==='lazy'?'Keeps drifting, with a small change of pulse.':'Gently adjusts its course and pulse, then drifts on.';
+  return `<div class="r"><span>${kind==='jelly'?'Favorite depth':'Favorite spot'}</span><div class="hint">${place}. ${kind==='jelly'?(floor?'A quiet place to settle.':'A familiar layer to drift back to.'):'A place to wander back to.'}</div></div>
+    <div class="r"><span>Say hello</span><div class="hint">${greeting} Tap empty glass ${kind==='shrimp'?'near the sand ':''}to watch.</div></div>`;
+}
 function sheetFish(f){
   const sp=SP[f.sp],kind=kindOf(f),st=stageOf(f),inc=incomePerHour(f),tr=TRAIT[f.trait];
   const nextAge=st<2?fmtDur(STAGE_AGE[st]-f.age):'';
@@ -517,8 +534,9 @@ function sheetFish(f){
     <div class="kv">
       <div class="r"><span>Food</span><div class="bar ${barCls(f.hunger,45,25)}"><i style="width:${pctW(f.hunger)}%"></i></div></div>
       <div class="r"><span>Health</span><div class="bar ${barCls(f.health,60,35)}"><i style="width:${pctW(f.health)}%"></i></div></div>
-      <div class="r"><span>Nature</span><div class="hint"><b style="color:var(--fg)">${tr.n}.</b> ${tr.d}</div></div>
+      <div class="r"><span>Nature</span><div class="hint"><b style="color:var(--fg)">${tr.n}.</b> ${kind==='fish'?tr.d:kind==='shrimp'?'A little forager with its own pace.':'A gentle drifter with its own rhythm.'}</div></div>
       ${f.hyb?`<div class="r"><span>Hybrid</span><div class="hint">Sterile, but worth more.</div></div>`:(sp.quirk?`<div class="r"><span>Quirk</span><div class="hint">${sp.quirk}</div></div>`:'')}
+      ${creatureHabits(f)}
       <div class="r"><span>Likes</span><div class="hint">${rangeOf(f).lo}–${rangeOf(f).hi}°C${sp.sens?' · very clean water':''}</div></div>
       <div class="r"><span>Worth</span><div>${coinHtml(fishValue(f))}</div></div>
       <div class="r"><span>Earns</span><div class="hint">${inc>0?inc.toFixed(1)+' coins an hour':(st<1?'Starts when it is a juvenile':'Nothing while hungry or sick')}</div></div>

@@ -62,17 +62,8 @@ function waterTap(x,y){
   if(y>SAND_Y+1){burst('sand',x,y,{n:5});}
   else ripple(x,y,15,{ry:0.5});
   sfx.tink();
-  for(const f of S.fish){
-    const r=scene.rt.get(f.id);if(!r||r.sleep||f.sick) continue;
-    const kind=kindOf(f);
-    if(kind==='shrimp'||(kind==='jelly'&&!SP[f.sp].glide)) continue;
-    const d=Math.hypot(r.x-x,r.y-y);
-    if(f.trait==='shy'){
-      if(d<48){r.flee=0.9;r.wait=0;r.tx=clamp(r.x+(r.x-x)*3,8,152);r.ty=clamp(r.y+(r.y-y)*3,12,SAND_Y-10);}
-    }else if(d<95&&(f.trait==='bold'||f.trait==='greedy'||f.trait==='social'||f.trait==='playful'||Math.random()<0.3)){
-      r.tx=x;r.ty=clamp(y,10,SAND_Y-8);r.wait=0;r.chase=0;
-    }
-  }
+  reactToGlass(x,y);
+
 }
 
 /* ----- celebration events queued by the sim ----- */
