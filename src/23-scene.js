@@ -435,7 +435,9 @@ function moveGreeting(f,r,dt,speed){
   const tx=retreat?g.awayX:g.x,ty=retreat?g.awayY:g.y;
   const dx=tx-r.x,dy=ty-r.y,d=Math.hypot(dx,dy);
   const pace=retreat?(REDUCED?0.8:1.3):(f.trait==='shy'?0.5:f.trait==='playful'?1.05:0.85);
-  if(!retreat&&g.approachLimit===undefined) g.approachLimit=clamp(d/Math.max(1,speed*pace)+2,8,18);
+  // Account for the actual species, trait and daylight pace. A fixed ceiling
+  // made slow dusk swimmers abandon greetings before they could arrive.
+  if(!retreat&&g.approachLimit===undefined) g.approachLimit=Math.max(8,d/(speed*pace)+2);
   const step=Math.min(d,speed*pace*dt);
   if(d>0){r.x+=dx/d*step;r.y+=dy/d*step;}
   if(Math.abs(dx)>2){const dir=dx<0?-1:1;if(dir!==r.dir){r.dir=dir;r.turn=REDUCED?0:0.2;}}

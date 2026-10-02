@@ -53,8 +53,24 @@ check('food, sleep, sickness and fleeing interrupt safely',()=>{
   reset();[f,r]=fish();reactToGlass(80,45);f.sick=true;advance(.1);assert.equal(r.greeting,null);
   reset();[f,r]=fish();reactToGlass(80,45);r.flee=1;r.tx=140;r.ty=80;advance(.1);assert.equal(r.greeting,null);assert.equal(r.tx,140);assert.equal(r.ty,80);reactToGlass(80,45);assert.equal(r.greeting,null);
 });
-check('reduced motion skips greeting effects',()=>{
-  reset();fish();reactToGlass(60,45);advance(4);if(REDUCED) assert.equal(scene.fx.length,0);
+check('slow dusk fish reaches and lingers at its actual pace',()=>{
+  reset();const [f,r]=fish('social','pleco',20,45);dayLight=()=>0.41;reactToGlass(105,45);let linger=false;
+  for(let i=0;i<800;i++){advance(0.05);if(r.greeting?.phase==='linger'){linger=true;break;}}
+  assert.ok(linger);assert.ok(Math.hypot(r.x-r.greeting.x,r.y-r.greeting.y)<3);
+  advance(3);assert.equal(r.greeting,null);dayLight=()=>1;
+});
+check('greeting heart is visible on arrival only with normal motion',()=>{
+  reset();const [f,r]=fish();reactToGlass(60,45);let arrived=false;
+  for(let i=0;i<200;i++){
+    advance(0.05);
+    if(REDUCED) assert.equal(scene.fx.filter(e=>e.type==='heart').length,0);
+    if(r.greeting?.phase==='linger'){
+      arrived=true;
+      assert.equal(scene.fx.some(e=>e.type==='heart'),!REDUCED);
+      break;
+    }
+  }
+  assert.ok(arrived,'inspect the arrival frame before the heart expires');
 });
 check('greetings change no economy and do not create non-fish habits',()=>{
   reset();const [f]=fish();const before=JSON.stringify(S);reactToGlass(80,45);advance(24);assert.equal(JSON.stringify(S),before);
