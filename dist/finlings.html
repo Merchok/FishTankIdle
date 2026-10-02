@@ -556,7 +556,7 @@ function makeFish(sp,g,age,hyb){
   const f={id:S.nextId++,name:pick(NAMES),sp,g,age,trait:pick(TRAITS).id,
     hunger:age>=STAGE_AGE[1]?85:95,health:100,sick:false,cool:0};
   if(hyb) f.hyb=hyb;
-  ensureFavoritePlace(f);
+  ensureFavoritePlace(f);ensurePreferredDepth(f);
   return f;
 }
 function discoverAlleles(sp,g,id){
@@ -613,7 +613,7 @@ function normalize(o){
   s.themes=Object.assign({open:1},o.themes||{});
   for(const f of (o.fish||[]).concat(o.polyps||[])){if(f){f.sp=fixId(f.sp);if(f.hyb) f.hyb=fixId(f.hyb);}}
   s.fish=(o.fish||[]).filter(f=>f&&SP[f.sp]&&f.g&&(!f.hyb||SP[f.hyb]));
-  for(const f of s.fish){if(!f.trait||!TRAIT[f.trait]) f.trait=pick(TRAITS).id;ensureFavoritePlace(f,s);}
+  for(const f of s.fish){if(!f.trait||!TRAIT[f.trait]) f.trait=pick(TRAITS).id;ensureFavoritePlace(f,s);ensurePreferredDepth(f);}
   s.polyps=(o.polyps||[]).filter(p=>p&&SP[p.sp]&&p.g&&(!p.hyb||SP[p.hyb]));
   s.eggs=(o.eggs||[]).map(e=>{
     e.sp=fixId(e.sp);
@@ -624,10 +624,10 @@ function normalize(o){
   if(s.pile===0&&s.coinFrac){s.pile=s.coinFrac;s.coinFrac=0;}
   return s;
 }
-/* A small, saved habit, not a need: fish remember a place without rewards or decay.
+/* A small, saved habit, not a need: fish and shrimp remember a place without rewards or decay.
    Coordinates use the tank's fixed 160 × 120 space, so resizing does not move it. */
 function ensureFavoritePlace(f,state=S){
-  if(kindOf(f)!=='fish') return null;
+  if(kindOf(f)==='jelly') return null;
   const slots=state.decor.slots,seed=hash2(f.id,37);
   const placed=slots.map((id,slot)=>({id,slot})).filter(p=>DECOR[p.id]);
   let home=f.favorite;
@@ -648,7 +648,9 @@ function ensureFavoritePlace(f,state=S){
   }
   if(!home||(!home.decor&&placed.length)){
     const sheltered=placed.filter(p=>DECOR[p.id].plant);
-    const choices=f.trait==='shy'&&sheltered.length?sheltered:placed;
+    const grazing=placed.filter(p=>DECOR[p.id].plant||['rock','pebbles','wood'].includes(p.id));
+    const choices=f.trait==='shy'&&sheltered.length?sheltered:
+      kindOf(f)==='shrimp'&&grazing.length?grazing:placed;
     const p=choices.length?choices[seed%choices.length]:null;
     home={decor:p?p.id:null,slot:p?p.slot:seed%5,
       x:18+seed%125,y:clamp(24+SP[f.sp].dep*65+(seed%13-6),14,96)};
@@ -667,6 +669,21 @@ function favoritePlaceLabel(f){
   const side=h.x<58?'left':h.x>102?'right':'middle';
   return h.decor?'Near the '+DECOR[h.decor].n.toLowerCase()+' ('+side+')':
     'A quiet spot '+(side==='middle'?'in the middle':'on the '+side);
+}
+/* Depth is a fraction of the swimming band, independent of sprite size/stage.
+   Polyps never call this: they remain colonies in the simulation, not swimmers. */
+function ensurePreferredDepth(f){
+  if(kindOf(f)!=='jelly') return null;
+  if(SP[f.sp].floor) f.preferredDepth=0.98;
+  else if(!Number.isFinite(f.preferredDepth)||f.preferredDepth<0.15||f.preferredDepth>0.8){
+    f.preferredDepth=clamp(SP[f.sp].dep+(hash2(f.id,73)%21-10)/100,0.15,0.8);
+  }
+  return f.preferredDepth;
+}
+function preferredDepthLabel(f){
+  const d=ensurePreferredDepth(f);
+  return SP[f.sp].floor?'Resting upside down on the sand':
+    d<0.35?'The upper water':d<0.6?'The middle water':'The deeper water';
 }
 function serialize(){S.savedAt=Date.now();S.lastSeen=Date.now();return JSON.stringify(S);}
 
@@ -1176,9 +1193,10 @@ function buildShrimp(f,stage,sick){
   const tipX=Math.round(cx(1)),tipY=Math.round(cy(1));
   const fanCol=ghost?rgba(tc(lighten(base,0.2)),0.75):tc(mixHex(base,acc,0.35));
   [[1,-1],[1,0],[1,1],[2,0],[0,2],[1,2]].forEach(o=>{const x=tipX+o[0],y=tipY+o[1];if(g[y]&&x<W&&!g[y][x]) g[y][x]=fanCol;});
-  const legCol=tc(darken(base,0.35));
+  const legCol=tc(darken(base,0.35)),legs=[];
   for(let t=0.14;t<0.6;t+=0.1){
     const x=Math.round(cx(t)),y=Math.round(cy(t)+rad(t))+1;
+    legs.push({x,y,col:ghost?rgba(legCol,0.7):legCol});
     if(g[y]&&!g[y][x]) g[y][x]=ghost?rgba(legCol,0.7):legCol;
     if(L>=12&&g[y+1]&&!g[y+1][x-1]) g[y+1][x-1]=ghost?rgba(legCol,0.6):legCol;
   }
@@ -1205,7 +1223,7 @@ function buildShrimp(f,stage,sick){
     for(let y=0;y<Hc;y++) for(let x=0;x<W;x++) g[y][x]=out[y][x];
   }
   const eggPos={x:Math.round(cx(0.78)),y:Math.round(cy(0.78)+rad(0.78))+2};
-  return {cv:gridToCanvas(g,W,Hc),w:W,h:Hc,glow:ph.sheen===1,pearl:ph.sheen===2,glowRGB:[255,255,190],feet:feet+1,eggPos};
+  return {cv:gridToCanvas(g,W,Hc),w:W,h:Hc,glow:ph.sheen===1,pearl:ph.sheen===2,glowRGB:[255,255,190],feet:feet+1,eggPos,legs};
 }
 
 /* ================= card previews ================= */
@@ -1349,6 +1367,7 @@ function rtFor(f){
     const kind=kindOf(f),s=getSprite(f,stageOf(f),f.sick);
     r={x:rnd(20,140),y:kind==='fish'?rnd(20,90):(kind==='jelly'?rnd(25,60):floorY(f,s)),tx:80,ty:60,dir:Math.random()<0.5?-1:1,wait:rnd(0,1.5),phase:rnd(0,6.28),pp:Math.random(),
       turn:0,shim:0,flee:0,chase:0,chaseT:0,nibble:false,hop:0,hopV:0,molt:rnd(90,240),sleep:false};
+    if(kind==='jelly') r.ty=jellyDepthY(f,s);
     scene.rt.set(f.id,r);
   }
   return r;
@@ -1390,24 +1409,86 @@ function reactToGlass(x,y){
   if(room<=0) return;
   const nearby=S.fish.filter(f=>{
     const r=scene.rt.get(f.id);
-    return kindOf(f)==='fish'&&r&&!r.greeting&&r.flee<=0&&!f.sick&&!r.sleep&&dayLight()>=0.4&&
+    return r&&!r.greeting&&r.flee<=0&&!f.sick&&!r.sleep&&dayLight()>=0.4&&
       !(scene.food.length&&f.hunger<(f.trait==='greedy'?98:92))&&
-      scene.t>=(r.greetAfter||0)&&Math.hypot(r.x-x,r.y-y)<(f.trait==='shy'?52:90);
+      scene.t>=(r.greetAfter||0)&&!(kindOf(f)==='shrimp'&&r.hop>0)&&
+      Math.hypot(r.x-x,r.y-y)<(kindOf(f)==='fish'?(f.trait==='shy'?52:90):48);
   }).sort((a,b)=>{
     const ar=scene.rt.get(a.id),br=scene.rt.get(b.id);
     return Math.hypot(ar.x-x,ar.y-y)-Math.hypot(br.x-x,br.y-y);
   }).slice(0,room);
   nearby.forEach((f,i)=>{
-    const r=scene.rt.get(f.id),shy=f.trait==='shy';
+    const r=scene.rt.get(f.id),shy=f.trait==='shy',kind=kindOf(f);
     r.greetAfter=scene.t+12;r.wait=0;r.chase=0;r.nibble=false;r.atHome=false;r.visitingHome=false;
     const dx=r.x-x,dy=r.y-y,d=Math.hypot(dx,dy)||1;
+    if(kind==='shrimp'){
+      const distance={shy:14,bold:4,greedy:3,lazy:0,social:6,playful:9}[f.trait];
+      const away=dx<0?-1:dx>0?1:r.x<80?1:-1;
+      r.foraging=false;
+      r.greeting={phase:'freeze',t:0,originX:r.x,awayX:clamp(r.x+away*distance,8,152),
+        pause:f.trait==='lazy'?1.8:shy?1.1:0.45};
+      return;
+    }
+    if(kind==='jelly'){
+      const sp=SP[f.sp],s=getSprite(f,stageOf(f),f.sick),toward=x<r.x?-1:1;
+      const offset=f.trait==='lazy'?0:sp.floor?3:shy?-8:f.trait==='playful'?12:8;
+      r.greeting={phase:'drift',t:0,courseX:clamp(r.x+toward*offset,14,146),
+        courseY:jellyDepthY(f,s),duration:f.trait==='lazy'?3:4.5};
+      return;
+    }
     r.greeting={phase:shy?'retreat':f.trait==='lazy'?'watch':'approach',t:0,
       x:clamp(x+(i-1)*9,10,150),y:clamp(y+(i%2?6:-4),14,SAND_Y-10),
       awayX:clamp(r.x+(dx?dx/d:(r.x<80?1:-1))*24,10,150),
       awayY:clamp(r.y+dy/d*18,14,SAND_Y-10)};
   });
 }
+function endGreeting(r){r.greeting=null;r.wait=0;r.tx=r.x;r.ty=r.y;}
+function moveShrimpGreeting(f,r,dt,speed){
+  const g=r.greeting;g.t+=dt;
+  r.y=floorY(f,getSprite(f,stageOf(f),f.sick));
+  if(g.phase==='freeze'){
+    if(g.t>=g.pause){
+      if(f.trait==='lazy'){endGreeting(r);return true;}
+      g.phase='retreat';g.t=0;
+    }
+    return true;
+  }
+  if(g.phase==='settle'){
+    if(g.t>=1){endGreeting(r);}
+    return true;
+  }
+  const retreat=g.phase==='retreat',target=retreat?g.awayX:g.originX,dx=target-r.x;
+  const pace=retreat?(REDUCED?0.55:0.9):0.45;
+  r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*pace*dt);
+  if(Math.abs(dx)>0.5) r.dir=dx<0?-1:1;
+  if(Math.abs(target-r.x)<0.5){g.phase=retreat?'return':'settle';g.t=0;}
+  return true;
+}
+function steerJellyGreeting(f,r,dt){
+  const g=r.greeting;g.t+=dt;
+  if(g.t>=g.duration){endGreeting(r);r.ty=jellyDepthY(f,getSprite(f,stageOf(f),f.sick));return;}
+  r.tx=g.courseX;r.ty=g.courseY;r.wait=0;
+}
+function jellyPulseRate(f,r){
+  // Keep the native pulse continuous; only its pace changes a little.
+  if(!r.greeting||REDUCED) return 1;
+  return {shy:0.94,bold:1.08,greedy:1.04,lazy:0.96,social:1.04,playful:1.12}[f.trait]||1;
+}
+function jellyDepthY(f,s){
+  const depth=ensurePreferredDepth(f),sp=SP[f.sp];
+  if(sp.floor) return SAND_Y+4-s.h/2;
+  const bottom=Math.max(14,SAND_Y-(sp.glide?s.h/2:s.h)-4);
+  return clamp(14+depth*(SAND_Y-40),14,bottom);
+}
+function pickJellyTarget(f,r,s){
+  const band=f.trait==='playful'?9:f.trait==='lazy'?3:6;
+  r.tx=rnd(14,146);r.ty=clamp(jellyDepthY(f,s)+rnd(-band,band),14,
+    Math.max(14,SAND_Y-(SP[f.sp].glide?s.h/2:s.h)-4));
+  r.chase=0;r.nibble=false;r.visitingHome=false;
+}
 function moveGreeting(f,r,dt,speed){
+  if(kindOf(f)==='shrimp') return moveShrimpGreeting(f,r,dt,speed);
+  if(kindOf(f)==='jelly'){steerJellyGreeting(f,r,dt);return false;}
   const g=r.greeting;if(!g) return false;
   g.t+=dt;
   if(g.phase==='watch'||g.phase==='linger'){
@@ -1434,6 +1515,7 @@ function moveGreeting(f,r,dt,speed){
 }
 
 function pickFishTarget(f,r,sp,st,night){
+  if(kindOf(f)==='jelly'){pickJellyTarget(f,r,getSprite(f,stageOf(f),f.sick));return;}
   const tr=f.trait,plants=plantXs();
   r.nibble=false;r.visitingHome=false;
   const home=kindOf(f)==='fish'?ensureFavoritePlace(f):null;
@@ -1478,6 +1560,7 @@ function moveFish(f,r,sp,st,night,dt,speed,hungryFood){
   if(r.wait>0){r.wait-=dt;return;}
   const dx=r.tx-r.x,dy=r.ty-r.y,d=Math.hypot(dx,dy);
   if(d<2.5){
+    if(kindOf(f)==='jelly'&&r.greeting) return;
     r.atHome=!!r.visitingHome;
     r.wait=r.atHome?rnd(3,6)*(f.trait==='lazy'?1.5:1):rnd(0.3,2.4)*(f.trait==='lazy'?2.2:1)*(r.nibble?2.5:1);
     if(r.nibble) S.algae=Math.max(0,S.algae-1.2);
@@ -1501,16 +1584,19 @@ function moveShrimp(f,r,sp,st,night,dt,speed,hungryFood,s){
   r.y=fy;
   if(hungryFood){
     const fl=nearestFlake(r,true);
-    if(fl){r.tx=fl.x;speed*=2;r.wait=0;}
+    if(fl){r.tx=fl.x;speed*=2;r.wait=0;r.atHome=false;r.visitingHome=false;}
   }
   if(r.wait>0){r.wait-=dt;return;}
   const dx=r.tx-r.x;
   if(Math.abs(dx)<2){
-    r.wait=rnd(1,4)*(f.trait==='lazy'?1.8:1);
-    r.tx=rnd(10,150);
-    if(f.trait==='shy'&&plantXs().length&&Math.random()<0.6) r.tx=pick(plantXs())+rnd(-10,10);
-    if(st>0&&Math.random()<(f.trait==='playful'?0.3:0.1)&&night<0.5){r.hop=1;r.hopV=-34;}
+    r.atHome=!!r.visitingHome;
+    r.wait=(r.atHome?rnd(3,6):rnd(1,4))*(f.trait==='lazy'?1.8:1);
+    const home=ensureFavoritePlace(f);
+    r.visitingHome=night>0.6||Math.random()<(f.trait==='shy'||f.trait==='lazy'?0.7:0.5);
+    r.tx=r.visitingHome?home.x:rnd(10,150);
+    if(!r.atHome&&!REDUCED&&st>0&&Math.random()<(f.trait==='playful'?0.3:0.1)&&night<0.5){r.hop=1;r.hopV=-34;}
   }else{
+    r.atHome=false;
     r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*dt);
     const nd=dx<0?-1:1;if(nd!==r.dir){r.dir=nd;r.turn=0.2;}
   }
@@ -1520,26 +1606,26 @@ function moveJelly(f,r,sp,st,night,dt,speed,hungryFood,s){
     r.y=SAND_Y+2-s.h/2+2;
     if(r.wait>0){r.wait-=dt;return;}
     const dx=r.tx-r.x;
-    if(Math.abs(dx)<2){r.wait=rnd(6,16);r.tx=rnd(14,146);}
+    if(Math.abs(dx)<2){if(!r.greeting){r.wait=rnd(6,16);r.tx=rnd(14,146);}}
     else r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*0.5*dt);
     return;
   }
+  if(hungryFood){const fl=nearestFlake(r,false,60);if(fl){r.tx=fl.x;r.ty=fl.y-8;}}
   const up=r.pp<0.5;
   let vy=up?-12*(1-r.pp*2*0.6):4.5;
   if(r.y<r.ty-4) vy+=up?5:6;
   if(r.y>r.ty+10) vy-=up?0:2;
-  r.y=clamp(r.y+vy*dt*(1-night*0.3),10,SAND_Y-s.h-4);
-  if(hungryFood){const fl=nearestFlake(r,false,60);if(fl){r.tx=fl.x;r.ty=fl.y-8;}}
+  r.y=clamp(r.y+vy*dt*(1-night*0.3),10,Math.max(10,SAND_Y-s.h-4));
   const dx=r.tx-r.x;
-  if(Math.abs(dx)<3&&r.wait<=0){r.wait=rnd(2,6);}
-  if(r.wait>0){r.wait-=dt;if(Math.abs(dx)<3) return;}
-  if(Math.abs(dx)>=3){
-    r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*(up?1.4:0.5)*dt);
-    const nd=dx<0?-1:1;if(nd!==r.dir){r.dir=nd;}
-  }else if(r.wait<=0){
-    r.tx=rnd(14,146);r.ty=rnd(16,SAND_Y-40);
+  if(Math.abs(dx)<3){
+    if(r.greeting||hungryFood) return;
+    if(r.wait<=0) r.wait=rnd(2,6);
+    r.wait-=dt;
+    if(r.wait<=0) pickJellyTarget(f,r,s);
+    return;
   }
-  if(Math.abs(dx)<3){r.tx=rnd(14,146);r.ty=rnd(16,SAND_Y-40);}
+  r.x+=Math.sign(dx)*Math.min(Math.abs(dx),speed*(up?1.4:0.5)*dt);
+  const nd=dx<0?-1:1;if(nd!==r.dir) r.dir=nd;
 }
 
 function updateScene(dt){
@@ -1562,16 +1648,17 @@ function updateScene(dt){
     let speed=sp.spd*16*(st===0?1.25:1)*(f.sick?0.45:1)*(1-night*0.6)*traitSpeed(tr);
     if(r.sleep) speed*=0.35;
     if(r.flee>0) speed*=2.4;
-    if(kind==='jelly') r.pp=(r.pp+dt*0.4*(sp.pulse||1))%1;
     if(r.greeting&&(hungryFood||r.sleep||f.sick||r.flee>0)){
       r.greeting=null;r.wait=0;
       if(r.flee<=0){r.tx=r.x;r.ty=r.y;}
     }
-    if(kind==='fish') ensureFavoritePlace(f);
+    ensureFavoritePlace(f);ensurePreferredDepth(f);
+    if(kind==='jelly') r.pp=(r.pp+dt*0.4*(sp.pulse||1)*jellyPulseRate(f,r))%1;
     if(r.greeting&&moveGreeting(f,r,dt,speed)){}
     else if(kind==='fish'||sp.glide) moveFish(f,r,sp,st,night,dt,speed,hungryFood);
     else if(kind==='shrimp') moveShrimp(f,r,sp,st,night,dt,speed,hungryFood,s);
     else moveJelly(f,r,sp,st,night,dt,speed,hungryFood,s);
+    r.foraging=kind==='shrimp'&&r.wait>0&&r.hop<=0&&!r.greeting&&!r.sleep&&!f.sick;
     r.x=clamp(r.x,6,154);
     if(kind==='fish') r.y=clamp(r.y,8,SAND_Y-4);
     else if(sp.glide) r.y=clamp(r.y,8,SAND_Y-s.h/2-4);
@@ -1725,8 +1812,13 @@ function drawScene(){
     const wig=SP[f.sp].kind==='fish'?(r.sleep?0.15:(f.sick?0.25:0.45+Math.min(1,(r.mv||0)/14)*0.9)):0;
     const flipX=r.dir>0,flipY=false;
     const berried=carriers.has(f.id)&&s.eggPos;
-    drawSpr(c,s,r,x,y,flipX,flipY,sx,frame,berried?(cc=>{
-      for(let k=0;k<4;k++){cc.fillStyle=k%2?'#8fd36a':'#c6e86a';cc.fillRect(s.eggPos.x-k,s.eggPos.y+(k%2),1,1);}
+    const forage=r.foraging&&s.legs&&!REDUCED;
+    drawSpr(c,s,r,x,y,flipX,flipY,sx,frame,(berried||forage)?(cc=>{
+      if(berried) for(let k=0;k<4;k++){cc.fillStyle=k%2?'#8fd36a':'#c6e86a';cc.fillRect(s.eggPos.x-k,s.eggPos.y+(k%2),1,1);}
+      if(forage) s.legs.forEach((leg,i)=>{
+        const reach=(Math.floor(r.phase*2)+i)%2;
+        cc.fillStyle=leg.col;cc.fillRect(leg.x-reach,leg.y+1,1,1);
+      });
     }):null,sy,wig);
     if(s.pearl&&Math.sin(t*3+r.phase*2)>0.94){const px=x+Math.round(s.w*0.45),py=y+Math.round(s.h*0.4);R(c,'#fff',px,py,1,1);R(c,'#fff',px-1,py,3,1);R(c,'#fff',px,py-1,1,3);}
     if(f.sick){R(c,'#7ee08a',x+s.w/2-1,y-6,3,1);R(c,'#7ee08a',x+s.w/2,y-7,1,3);}
@@ -2241,17 +2333,7 @@ function waterTap(x,y){
   else ripple(x,y,15,{ry:0.5});
   sfx.tink();
   reactToGlass(x,y);
-  // Comb jellies keep their existing simple response; fish use the habits above.
-  for(const f of S.fish){
-    if(kindOf(f)!=='jelly'||!SP[f.sp].glide) continue;
-    const r=scene.rt.get(f.id);if(!r||r.sleep||f.sick) continue;
-    const d=Math.hypot(r.x-x,r.y-y);
-    if(f.trait==='shy'){
-      if(d<48){r.flee=0.9;r.wait=0;r.tx=clamp(r.x+(r.x-x)*3,8,152);r.ty=clamp(r.y+(r.y-y)*3,12,SAND_Y-10);}
-    }else if(d<95&&(f.trait!=='lazy'||Math.random()<0.3)){
-      r.tx=x;r.ty=clamp(y,10,SAND_Y-8);r.wait=0;r.chase=0;
-    }
-  }
+
 }
 
 /* ----- celebration events queued by the sim ----- */
@@ -2957,6 +3039,23 @@ function hxTick(now){
   hxRaf=requestAnimationFrame(hxTick);
 }
 function hxStart(){if(!hxRaf&&!REDUCED&&document.querySelector('.hx-svg')) hxRaf=requestAnimationFrame(hxTick);}
+function creatureHabits(f){
+  const kind=kindOf(f),floor=SP[f.sp].floor;
+  const place=kind==='jelly'?preferredDepthLabel(f):favoritePlaceLabel(f);
+  const greeting=kind==='fish'?{
+    shy:'Hangs back at first, then comes closer slowly.',bold:'Swims over to see you.',
+    greedy:'Checks for a snack, then goes exploring.',lazy:'Watches you from a comfy distance.',
+    social:'Comes close and stays a little while.',playful:'Eager to come over and investigate.'
+  }[f.trait]:kind==='shrimp'?{
+    shy:'Freezes, takes a small step back, then cautiously returns.',bold:'Pauses, steps aside and soon resumes exploring.',
+    greedy:'Pauses briefly, then gets back to foraging.',lazy:'Stays still a little longer before carrying on.',
+    social:'Pauses and steps aside, then returns to its little patch.',playful:'Takes a quick little step back, then slowly comes back.'
+  }[f.trait]:floor?'Keeps resting on the sand, with a gentle change of pulse.':
+    f.trait==='shy'?'Gently turns away, then returns to its favorite depth.':
+    f.trait==='lazy'?'Keeps drifting, with a small change of pulse.':'Gently adjusts its course and pulse, then drifts on.';
+  return `<div class="r"><span>${kind==='jelly'?'Favorite depth':'Favorite spot'}</span><div class="hint">${place}. ${kind==='jelly'?(floor?'A quiet place to settle.':'A familiar layer to drift back to.'):'A place to wander back to.'}</div></div>
+    <div class="r"><span>Say hello</span><div class="hint">${greeting} Tap empty glass ${kind==='shrimp'?'near the sand ':''}to watch.</div></div>`;
+}
 function sheetFish(f){
   const sp=SP[f.sp],kind=kindOf(f),st=stageOf(f),inc=incomePerHour(f),tr=TRAIT[f.trait];
   const nextAge=st<2?fmtDur(STAGE_AGE[st]-f.age):'';
@@ -2966,10 +3065,9 @@ function sheetFish(f){
     <div class="kv">
       <div class="r"><span>Food</span><div class="bar ${barCls(f.hunger,45,25)}"><i style="width:${pctW(f.hunger)}%"></i></div></div>
       <div class="r"><span>Health</span><div class="bar ${barCls(f.health,60,35)}"><i style="width:${pctW(f.health)}%"></i></div></div>
-      <div class="r"><span>Nature</span><div class="hint"><b style="color:var(--fg)">${tr.n}.</b> ${tr.d}</div></div>
+      <div class="r"><span>Nature</span><div class="hint"><b style="color:var(--fg)">${tr.n}.</b> ${kind==='fish'?tr.d:kind==='shrimp'?'A little forager with its own pace.':'A gentle drifter with its own rhythm.'}</div></div>
       ${f.hyb?`<div class="r"><span>Hybrid</span><div class="hint">Sterile, but worth more.</div></div>`:(sp.quirk?`<div class="r"><span>Quirk</span><div class="hint">${sp.quirk}</div></div>`:'')}
-      ${kind==='fish'?`<div class="r"><span>Favorite spot</span><div class="hint">${favoritePlaceLabel(f)}. A place to wander back to.</div></div>
-      <div class="r"><span>Say hello</span><div class="hint">${{shy:'Hangs back at first, then comes closer slowly.',bold:'Swims over to see you.',greedy:'Checks for a snack, then goes exploring.',lazy:'Watches you from a comfy distance.',social:'Comes close and stays a little while.',playful:'Eager to come over and investigate.'}[f.trait]} Tap empty glass to watch.</div></div>`:''}
+      ${creatureHabits(f)}
       <div class="r"><span>Likes</span><div class="hint">${rangeOf(f).lo}–${rangeOf(f).hi}°C${sp.sens?' · very clean water':''}</div></div>
       <div class="r"><span>Worth</span><div>${coinHtml(fishValue(f))}</div></div>
       <div class="r"><span>Earns</span><div class="hint">${inc>0?inc.toFixed(1)+' coins an hour':(st<1?'Starts when it is a juvenile':'Nothing while hungry or sick')}</div></div>

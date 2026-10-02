@@ -1,4 +1,4 @@
-"""Behavioral regression tests for favorite places and gentle glass greetings.
+"""Behavioral regression tests for fish, shrimp, and jellyfish little habits.
 
     bash build.sh
     python tests/fish_personality.py
@@ -32,6 +32,8 @@ INIT = """(() => {
 
 HARNESS = """() => {
   sceneStop();testIntervals.forEach(clearInterval);
+  window.testSeed=12345;
+  Math.random=()=>{testSeed=(Math.imul(testSeed,1664525)+1013904223)>>>0;return testSeed/4294967296;};
   window.testStep=(seconds)=>{
     for(let remaining=seconds;remaining>0.000001;){
       const dt=Math.min(0.05,remaining);scene.t+=dt;updateScene(dt);remaining-=dt;
@@ -43,19 +45,23 @@ HARNESS = """() => {
     S=defaultState();S.seenWelcome=true;S.news=NEWS_V;S.sound=false;S.tankLvl=3;
     S.coins=123;S.pile=0.5;S.algae=0;
     S.decor.slots=(options.decor||[null,null,null,null,null]).slice();
-    scene.t=100;scene.rt.clear();scene.decorMode=false;
+    testSeed=12345;scene.t=100;scene.rt.clear();SPRITES.clear();scene.decorMode=false;
     for(const key of ['food','fx','shells','bubbles','parts','ripples']) scene[key].length=0;
     JUICE_Q.length=0;dayLight=()=>1;
     for(const [index,config] of (options.fish||[{trait:'bold',x:55,y:45}]).entries()){
       const species=config.sp||'tetra';
       const f=makeFish(species,founderGenes(SP[species].kind),STAGE_AGE[1]+30);
       Object.assign(f,{name:'Test '+index,trait:config.trait||'bold',hunger:100},config.fish||{});
-      addFish(f);
-      const r=rtFor(f);
-      Object.assign(r,{x:config.x??55,y:config.y??45,tx:config.x??55,ty:config.y??45,
+      delete f.favorite;ensureFavoritePlace(f);ensurePreferredDepth(f);addFish(f);
+      const r=rtFor(f),sprite=getSprite(f,stageOf(f),f.sick),kind=kindOf(f);
+      const restingY=kind==='shrimp'?floorY(f,sprite):kind==='jelly'?
+        (SP[species].floor?SAND_Y+4-sprite.h/2:jellyDepthY(f,sprite)):45;
+      Object.assign(r,{x:config.x??55,y:config.y??restingY,tx:config.x??55,ty:config.y??restingY,
         wait:0,chase:0,chaseT:0,flee:0,sleep:false,greeting:null,greetAfter:0});
     }
-    updateScene(0);setTab('tank');drawScene();
+    updateScene(0);
+    for(const f of S.fish){const r=rtFor(f);Object.assign(r,{hop:0,hopV:0,wait:0,tx:r.x,ty:r.y});}
+    setTab('tank');drawScene();
     return S.fish.map(f=>f.id);
   };
   window.testFish=()=>S.fish[0];
@@ -100,11 +106,13 @@ async def favorites(page):
         const p=ensureFavoritePlace(f);
         return p&&S.decor.slots[p.slot]===p.decor&&Number.isFinite(p.x)&&Number.isFinite(p.y)
           &&p.x>=6&&p.x<=154&&p.y>=8&&p.y<=100;
-      }),nonfish:S.fish.filter(f=>kindOf(f)!=='fish').every(f=>!f.favorite),
+      }),shrimp:S.fish.filter(f=>kindOf(f)==='shrimp').every(f=>!!f.favorite),
+      jellies:S.fish.filter(f=>kindOf(f)==='jelly').every(f=>!f.favorite&&Number.isFinite(f.preferredDepth)),
       favorites:fish.map(f=>f.favorite)};
     }""")
     check('fish get valid favorite places beside installed decor', result['valid'], result['favorites'])
-    check('shrimp and jellyfish keep their existing behavior', result['nonfish'])
+    check('shrimp have favorite places and jellies have preferred depths',
+          result['shrimp'] and result['jellies'])
 
     before = await page.evaluate('S.fish.map(f=>f.favorite||null)')
     await page.evaluate('saveNow()')
@@ -169,6 +177,198 @@ async def favorites(page):
       return r.visitingHome&&Math.hypot(r.tx-f.favorite.x,r.ty-f.favorite.y)<6;
     }""")
     check('ordinary swimming sometimes targets the saved favorite', result)
+
+
+async def inhabitant_habits(page):
+    species = ['cherry', 'ghost', 'amano', 'moon', 'nettle', 'mat', 'comb', 'immortal', 'box']
+    await reset(page, decor=['castle', 'rock', None, 'kelp', None], fish=[
+        {'sp': sp, 'trait': 'shy'} for sp in species])
+    result = await page.evaluate("""() => {
+      return {shrimp:S.fish.filter(f=>kindOf(f)==='shrimp').every(f=>
+        f.favorite&&(f.favorite.decor==='rock'||DECOR[f.favorite.decor]?.plant)),
+        jellies:S.fish.filter(f=>kindOf(f)==='jelly').every(f=>
+          !f.favorite&&(SP[f.sp].floor?f.preferredDepth===.98:f.preferredDepth>=.15&&f.preferredDepth<=.8))};
+    }""")
+    check('shrimp choose rock/plant shelter and every jelly species has a safe depth',
+          all(result.values()), result)
+    before = await page.evaluate('S.fish.map(f=>({favorite:f.favorite||null,depth:f.preferredDepth??null}))')
+    await page.evaluate('saveNow()')
+    await page.reload()
+    await page.wait_for_function('S && scene.cv && scene.rt.size > 0')
+    await page.evaluate(HARNESS)
+    check('shrimp favorites and jelly depths survive a real save and reload',
+          await page.evaluate('S.fish.map(f=>({favorite:f.favorite||null,depth:f.preferredDepth??null}))') == before)
+    result = await page.evaluate("""async () => {
+      const habits=state=>JSON.stringify(state.fish.map(f=>({favorite:f.favorite||null,depth:f.preferredDepth??null})));
+      const before=habits(S),code=await makeBackupCode(),restored=normalize(await readBackupCode(code));
+      return {matches:habits(restored)===before,format:/^FIN1z?:/.test(code)};
+    }""")
+    check('all new saved habits survive a real backup-code encode/decode round trip',
+          all(result.values()), result)
+
+    result = await page.evaluate("""() => {
+      const shrimp=S.fish.filter(f=>kindOf(f)==='shrimp');
+      return shrimp.every(f=>{
+        const home={...f.favorite},slot=home.slot===4?0:4;
+        S.decor.slots[home.slot]=null;S.decor.slots[slot]=home.decor;ensureFavoritePlace(f);
+        const moved=f.favorite.slot===slot&&f.favorite.decor===home.decor;
+        S.decor.slots[slot]=null;ensureFavoritePlace(f);
+        const fallback=Number.isFinite(f.favorite.x)&&f.favorite.preferred===home.decor;
+        S.decor.slots[slot]=home.decor;ensureFavoritePlace(f);
+        return moved&&fallback&&f.favorite.slot===slot&&f.favorite.decor===home.decor;
+      });
+    }""")
+    check('shrimp favorites follow moved, removed, and replaced shelter', result)
+    result = await page.evaluate("""() => {
+      const raw=JSON.parse(serialize());
+      for(const f of raw.fish){delete f.favorite;delete f.preferredDepth;}
+      const migrate=source=>normalize(JSON.parse(JSON.stringify(source)));
+      const habits=state=>JSON.stringify(state.fish.map(f=>({favorite:f.favorite||null,depth:f.preferredDepth??null})));
+      const a=migrate(raw),b=migrate(raw);
+      for(const f of raw.fish){f.favorite={decor:'missing',slot:999,x:'bad',y:-999};f.preferredDepth='broken';}
+      const repaired=migrate(raw);
+      return {stable:habits(a)===habits(b),valid:repaired.fish.every(f=>kindOf(f)==='shrimp'?
+        Number.isFinite(f.favorite.x)&&Number.isFinite(f.favorite.y):
+        Number.isFinite(f.preferredDepth)&&(SP[f.sp].floor?f.preferredDepth===.98:f.preferredDepth>=.15&&f.preferredDepth<=.8))};
+    }""")
+    check('legacy and malformed non-fish habits migrate deterministically', all(result.values()), result)
+
+
+async def nonfish_greetings(page):
+    # Exercise real pointer routing once per movement style, then inspect all traits.
+    for sp in ['cherry', 'moon', 'mat', 'comb']:
+        await reset(page, fish=[{'sp': sp}])
+        y = await page.evaluate('Math.min(testRuntime().y,99)')
+        await tap(page, 90, y)
+        phase = 'freeze' if sp == 'cherry' else 'drift'
+        check(f'empty-glass touch starts the {sp} response without opening details',
+              await page.evaluate('(phase)=>testRuntime().greeting?.phase===phase&&!sheetState', phase))
+
+    result = await page.evaluate("""() => {
+      const failures=[];
+      for(const sp of ['cherry','ghost','amano'])for(const {id:trait} of TRAITS){
+        testReset({fish:[{sp,trait}]});const f=testFish(),r=testRuntime(),origin=r.x;
+        const fy=floorY(f,getSprite(f,stageOf(f),f.sick));waterTap(90,99);
+        let valid=r.greeting?.phase==='freeze',retreat=false,returned=false,start=null,closest=Infinity,maxStep=0;
+        testStep(.1);valid=valid&&r.x===origin;
+        for(let i=0;i<600&&r.greeting;i++){
+          const x=r.x;testStep(.05);maxStep=Math.max(maxStep,Math.abs(r.x-x));
+          valid=valid&&r.y===fy&&r.hop===0&&Number.isFinite(r.x)&&r.x>=6&&r.x<=154;
+          if(r.greeting?.phase==='retreat')retreat=true;
+          if(r.greeting?.phase==='return'){returned=true;const d=Math.abs(r.x-origin);if(start===null)start=d;closest=Math.min(closest,d);}
+        }
+        valid=valid&&!r.greeting&&maxStep<1&&!scene.fx.some(e=>e.type==='heart');
+        valid=valid&&(trait==='lazy'?r.x===origin:retreat&&returned&&closest<start&&Math.abs(r.x-origin)<3);
+        if(!valid)failures.push(sp+' '+trait);
+      }
+      return failures;
+    }""")
+    check('all shrimp species and traits freeze, retreat, and return gently on the sand', not result, result)
+
+    result = await page.evaluate("""() => {
+      const failures=[];
+      for(const sp of ['moon','nettle','mat','comb','immortal','box'])for(const {id:trait} of TRAITS){
+        testReset({fish:[{sp,trait}]});const f=testFish(),r=testRuntime(),sprite=getSprite(f,stageOf(f),f.sick);
+        const origin=r.x,depth=f.preferredDepth;waterTap(90,Math.min(r.y,99));
+        let valid=r.greeting?.phase==='drift'&&Math.abs(r.greeting.courseX-origin)<=12,maxStep=0,pulsed=false;
+        for(let i=0;i<200&&r.greeting;i++){
+          const {x,y,pp}=r;testStep(.05);maxStep=Math.max(maxStep,Math.hypot(r.x-x,r.y-y));pulsed=pulsed||r.pp!==pp;
+          valid=valid&&Number.isFinite(r.x)&&Number.isFinite(r.y)&&r.x>=6&&r.x<=154&&
+            (!r.greeting||r.greeting.phase==='drift')&&!r.chase;
+          if(SP[sp].floor)valid=valid&&r.y===SAND_Y+4-sprite.h/2;
+          else valid=valid&&r.y>=8&&r.y<=SAND_Y-sprite.h/2-4;
+        }
+        valid=valid&&!r.greeting&&pulsed&&maxStep<=Math.hypot(SP[sp].spd*16*traitSpeed(trait)*1.4*.05,.6)+1e-8&&f.preferredDepth===depth&&!scene.fx.some(e=>e.type==='heart');
+        if(!valid)failures.push(sp+' '+trait);
+      }
+      return failures;
+    }""")
+    check('all jelly species and traits keep gentle native motion, floor posture, and comb glide', not result, result)
+    result = await page.evaluate("""() => {
+      return ['moon','nettle','immortal','box'].every(sp=>{
+        testReset({fish:[{sp}]});const f=testFish(),r=testRuntime(),s=getSprite(f,stageOf(f),f.sick);
+        r.tx=r.x;r.wait=.1;const before=r.tx;
+        moveJelly(f,r,SP[sp],stageOf(f),0,.05,5,false,s);const paused=r.tx===before;
+        moveJelly(f,r,SP[sp],stageOf(f),0,.06,5,false,s);
+        return paused&&r.tx!==before&&Math.abs(r.ty-jellyDepthY(f,s))<=6;
+      });
+    }""")
+    check('native jellies resume wandering when their near-target pause ends', result)
+
+
+    await reset(page, fish=[{'sp': sp} for sp in ['tetra', 'cherry', 'moon', 'ghost', 'comb']])
+    result = await page.evaluate("""() => {
+      waterTap(85,80);const active=S.fish.filter(f=>rtFor(f).greeting);
+      const before=active.map(f=>JSON.stringify(rtFor(f).greeting));
+      for(let i=0;i<100;i++)waterTap(85,80);
+      return {count:S.fish.filter(f=>rtFor(f).greeting).length,
+        unchanged:active.every((f,i)=>JSON.stringify(rtFor(f).greeting)===before[i]),
+        bounded:scene.ripples.length<=16&&scene.parts.length<=221};
+    }""")
+    check('fish, shrimp, and jellies share the three-creature response cap', result['count'] == 3, result)
+    check('repeated mixed-tank taps preserve current responses and effect caps',
+          result['unchanged'] and result['bounded'])
+
+    result = await page.evaluate("""() => {
+      const failures=[];
+      for(const sp of ['cherry','moon','mat','comb']){
+        testReset({fish:[{sp}]});const r=testRuntime();waterTap(90,Math.min(r.y,99));
+        while(r.greeting&&scene.t<111.5)testStep(.05);
+        const ended=!r.greeting;waterTap(90,Math.min(r.y,99));const resting=!r.greeting;
+        testStep(13);Object.assign(r,{x:55,hop:0});waterTap(90,Math.min(r.y,99));
+        if(!(ended&&resting&&r.greeting))failures.push(sp);
+      }
+      return failures;
+    }""")
+    check('shrimp and jelly cooldowns prevent instant restarts but permit later responses', not result, result)
+
+    result = await page.evaluate("""() => {
+      const failures=[];
+      for(const sp of ['cherry','ghost','amano','moon','nettle','mat','comb','immortal','box']){
+        testReset({fish:[{sp}]});const before=JSON.stringify(S);waterTap(90,Math.min(testRuntime().y,99));testStep(24);
+        if(JSON.stringify(S)!==before)failures.push(sp);
+      }
+      return failures;
+    }""")
+    check('non-fish responses change no economy, health, hunger, genetics, or progression', not result, result)
+    check('new reactions and foraging stay out of saved creature data',
+          await page.evaluate("!JSON.parse(serialize()).fish.some(f=>'greeting' in f||'greetAfter' in f||'foraging' in f)"))
+
+    for sp in ['cherry', 'moon', 'mat', 'comb']:
+        await reset(page, fish=[{'sp': sp}])
+        point = await page.evaluate('({x:testRuntime().x,y:testRuntime().y})')
+        await tap(page, point['x'], point['y'])
+        check(f'direct {sp} touch still opens its details',
+              await page.evaluate("sheetState?.kind==='fish'&&sheetState.arg===testFish().id&&!testRuntime().greeting"))
+
+
+async def nonfish_priorities(page):
+    result = await page.evaluate("""() => {
+      const failures=[];
+      for(const sp of ['cherry','moon','mat','comb'])for(const priority of ['food','sleep','sick','flee']){
+        testReset({fish:[{sp}]});const f=testFish(),r=testRuntime();waterTap(90,Math.min(r.y,99));
+        const started=!!r.greeting;
+        if(priority==='food'){f.hunger=50;scene.food.push({x:120,y:kindOf(f)==='shrimp'?103:50,vy:0,t:10,floor:true});}
+        if(priority==='sleep')dayLight=()=>0;
+        if(priority==='sick')f.sick=true;
+        if(priority==='flee'){r.flee=1;r.tx=140;r.ty=70;}
+        testStep(.05);let valid=started&&!r.greeting;
+        if(priority==='food'&&kindOf(f)==='shrimp')valid=valid&&r.tx===120;
+        if(priority==='flee')valid=valid&&r.tx===140&&r.ty===70;
+        waterTap(90,Math.min(r.y,99));valid=valid&&!r.greeting;
+        if(!valid)failures.push(sp+' '+priority);
+      }
+      return failures;
+    }""")
+    check('food, sleep, sickness, and fleeing interrupt every non-fish movement style safely', not result, result)
+    await reset(page, fish=[])
+    result = await page.evaluate("""() => {
+      const p=newPolyp('moon',founderGenes('jelly'));S.polyps.push(p);const before=JSON.stringify(p);
+      for(let i=0;i<20;i++){waterTap(30,99);testStep(.5);}
+      return {still:JSON.stringify(p)===before,runtime:scene.rt.size===0,
+        noHabits:p.favorite===undefined&&p.preferredDepth===undefined};
+    }""")
+    check('polyps remain stationary without swimmer runtime or preferences', all(result.values()), result)
 
 
 async def greetings(page):
@@ -303,9 +503,11 @@ async def priorities(page):
     }""")
     check('avoidance interrupts a greeting without losing its escape target', result)
 
-    await reset(page, fish=[{'fish': {'sick': True}}, {'sp': 'cherry'}, {'sp': 'moon'}])
+    await reset(page, fish=[{'fish': {'sick': True}},
+                            {'sp': 'cherry', 'fish': {'sick': True}},
+                            {'sp': 'moon', 'fish': {'sick': True}}])
     await page.evaluate('waterTap(95,45)')
-    check('sick fish, shrimp, and jellyfish do not receive fish greetings',
+    check('sick fish, shrimp, and jellyfish do not receive glass responses',
           await page.evaluate('S.fish.every(f=>!rtFor(f).greeting)'))
 
     await reset(page)
@@ -335,6 +537,23 @@ async def reduced_motion(browser, errors):
     }""")
     check('reduced-motion reactions stay smooth, bounded, and finite',
           result['finite'] and result['maxStep'] < 4 and result['finished'], result)
+    result = await page.evaluate("""() => {
+      const failures=[];
+      for(const sp of ['cherry','moon','mat','comb']){
+        testReset({fish:[{sp}]});const f=testFish(),r=testRuntime(),sprite=getSprite(f,stageOf(f),f.sick);
+        waterTap(90,Math.min(r.y,99));let valid=!!r.greeting,maxStep=0;
+        for(let i=0;i<300;i++){
+          const {x,y}=r;testStep(.05);maxStep=Math.max(maxStep,Math.hypot(r.x-x,r.y-y));
+          valid=valid&&Number.isFinite(r.x)&&Number.isFinite(r.y)&&r.x>=6&&r.x<=154;
+          if(r.greeting&&kindOf(f)==='shrimp')valid=valid&&r.y===floorY(f,sprite)&&r.hop===0;
+          if(SP[sp].floor)valid=valid&&r.y===SAND_Y+4-sprite.h/2;
+        }
+        valid=valid&&!r.greeting&&maxStep<2&&scene.parts.length===0&&scene.ripples.length===0&&!scene.fx.some(e=>e.type==='heart');
+        if(!valid)failures.push(sp);
+      }
+      return failures;
+    }""")
+    check('reduced-motion shrimp and jelly responses stay bounded without bursts or hearts', not result, result)
     check('narrow mobile layout has no horizontal overflow',
           await page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
     await context.close()
@@ -365,8 +584,11 @@ async def main():
                                                 is_mobile=True, has_touch=True)
             page = await boot(context, errors)
             await favorites(page)
+            await inhabitant_habits(page)
             await greetings(page)
+            await nonfish_greetings(page)
             await priorities(page)
+            await nonfish_priorities(page)
             await screenshots(page)
             await reduced_motion(browser, errors)
             check('no browser script errors', not errors, errors)

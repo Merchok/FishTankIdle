@@ -43,10 +43,12 @@ You have to use **Safari** (not Chrome) for this.
 ## Little habits
 
 - Fish remember a favorite spot near a plant or decoration and wander back for a quiet pause. Shy fish prefer plants. With no decor, they pick a calm patch of water instead.
-- Favorite spots survive saves and backups. Move a favorite decoration and the fish follows it; remove it and the fish finds another spot.
-- Tap **empty glass** to say hello. Bold, social and playful fish come over; shy fish hang back, then cautiously approach; greedy fish check briefly; lazy fish watch from where they are. Tap a fish itself for its details and favorite spot.
-- Greetings are brief and limited to three fish at a time. Food, sleep and health take priority. There is no affection meter, bonus, penalty or daily task; these are simply little ways to get to know your crew.
-- Reduced motion keeps the greetings gentle and skips their hearts, ripples and tap wiggles.
+- Shrimp remember a grazing spot by a plant, rock or driftwood. Near-sand taps make them pause, take a small step back and gradually return; lazy shrimp simply pause. Resting foragers quietly work their legs.
+- Jellyfish remember a comfortable depth and gently vary their course and pulse when the glass is touched nearby. Upside-down jellies stay on the sand; comb jellies keep gliding. Polyps remain stationary colonies.
+- Favorite spots and depth preferences survive saves and backups. Move a favorite decoration and the fish follows it; remove it and the fish finds another spot.
+- Tap **empty glass** to say hello. Bold, social and playful fish come over; shy fish hang back, then cautiously approach; greedy fish check briefly; lazy fish watch from where they are. Tap a creature itself for its details and favorite spot or depth.
+- Greetings are brief and limited to three creatures at a time. Food, sleep and health take priority. There is no affection meter, bonus, penalty or daily task; these are simply little ways to get to know your crew.
+- Reduced motion keeps the greetings gentle and skips their hearts, ripples, tap wiggles and extra foraging-leg/pulse animation.
 
 ## Build
 
@@ -109,7 +111,7 @@ Everything lives in `src/`. The files are joined **in this order** into a single
 ## Testing
 
 - `tests/smoke.py` loads the built page in a phone-sized headless browser and checks the main loop (collect coins, feed, scrub, water change, buy a fish, save and reload) with no script errors.
-- `tests/fish_personality_unit.js` checks favorite persistence, movement and priorities directly in Node, in normal and reduced-motion modes (rendering is stubbed).
+- `tests/fish_personality_unit.js` checks fish/shrimp favorite persistence, jelly depths, species-specific reactions and priorities directly in Node, in normal and reduced-motion modes (rendering is stubbed).
 - `tests/fish_personality.py` checks saved favorite spots, decor changes, personality greetings, priorities, repeated taps and mobile/reduced-motion behavior.
 - `tests/offline.py` serves `dist/` locally, loads it once, cuts the network and checks that the game still starts from the service worker cache, plus the manifest, icons, fonts and the backup code round trip.
 

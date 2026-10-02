@@ -32,7 +32,7 @@ function makeFish(sp,g,age,hyb){
   const f={id:S.nextId++,name:pick(NAMES),sp,g,age,trait:pick(TRAITS).id,
     hunger:age>=STAGE_AGE[1]?85:95,health:100,sick:false,cool:0};
   if(hyb) f.hyb=hyb;
-  ensureFavoritePlace(f);
+  ensureFavoritePlace(f);ensurePreferredDepth(f);
   return f;
 }
 function discoverAlleles(sp,g,id){
@@ -89,7 +89,7 @@ function normalize(o){
   s.themes=Object.assign({open:1},o.themes||{});
   for(const f of (o.fish||[]).concat(o.polyps||[])){if(f){f.sp=fixId(f.sp);if(f.hyb) f.hyb=fixId(f.hyb);}}
   s.fish=(o.fish||[]).filter(f=>f&&SP[f.sp]&&f.g&&(!f.hyb||SP[f.hyb]));
-  for(const f of s.fish){if(!f.trait||!TRAIT[f.trait]) f.trait=pick(TRAITS).id;ensureFavoritePlace(f,s);}
+  for(const f of s.fish){if(!f.trait||!TRAIT[f.trait]) f.trait=pick(TRAITS).id;ensureFavoritePlace(f,s);ensurePreferredDepth(f);}
   s.polyps=(o.polyps||[]).filter(p=>p&&SP[p.sp]&&p.g&&(!p.hyb||SP[p.hyb]));
   s.eggs=(o.eggs||[]).map(e=>{
     e.sp=fixId(e.sp);
@@ -100,10 +100,10 @@ function normalize(o){
   if(s.pile===0&&s.coinFrac){s.pile=s.coinFrac;s.coinFrac=0;}
   return s;
 }
-/* A small, saved habit, not a need: fish remember a place without rewards or decay.
+/* A small, saved habit, not a need: fish and shrimp remember a place without rewards or decay.
    Coordinates use the tank's fixed 160 × 120 space, so resizing does not move it. */
 function ensureFavoritePlace(f,state=S){
-  if(kindOf(f)!=='fish') return null;
+  if(kindOf(f)==='jelly') return null;
   const slots=state.decor.slots,seed=hash2(f.id,37);
   const placed=slots.map((id,slot)=>({id,slot})).filter(p=>DECOR[p.id]);
   let home=f.favorite;
@@ -124,7 +124,9 @@ function ensureFavoritePlace(f,state=S){
   }
   if(!home||(!home.decor&&placed.length)){
     const sheltered=placed.filter(p=>DECOR[p.id].plant);
-    const choices=f.trait==='shy'&&sheltered.length?sheltered:placed;
+    const grazing=placed.filter(p=>DECOR[p.id].plant||['rock','pebbles','wood'].includes(p.id));
+    const choices=f.trait==='shy'&&sheltered.length?sheltered:
+      kindOf(f)==='shrimp'&&grazing.length?grazing:placed;
     const p=choices.length?choices[seed%choices.length]:null;
     home={decor:p?p.id:null,slot:p?p.slot:seed%5,
       x:18+seed%125,y:clamp(24+SP[f.sp].dep*65+(seed%13-6),14,96)};
@@ -143,6 +145,21 @@ function favoritePlaceLabel(f){
   const side=h.x<58?'left':h.x>102?'right':'middle';
   return h.decor?'Near the '+DECOR[h.decor].n.toLowerCase()+' ('+side+')':
     'A quiet spot '+(side==='middle'?'in the middle':'on the '+side);
+}
+/* Depth is a fraction of the swimming band, independent of sprite size/stage.
+   Polyps never call this: they remain colonies in the simulation, not swimmers. */
+function ensurePreferredDepth(f){
+  if(kindOf(f)!=='jelly') return null;
+  if(SP[f.sp].floor) f.preferredDepth=0.98;
+  else if(!Number.isFinite(f.preferredDepth)||f.preferredDepth<0.15||f.preferredDepth>0.8){
+    f.preferredDepth=clamp(SP[f.sp].dep+(hash2(f.id,73)%21-10)/100,0.15,0.8);
+  }
+  return f.preferredDepth;
+}
+function preferredDepthLabel(f){
+  const d=ensurePreferredDepth(f);
+  return SP[f.sp].floor?'Resting upside down on the sand':
+    d<0.35?'The upper water':d<0.6?'The middle water':'The deeper water';
 }
 function serialize(){S.savedAt=Date.now();S.lastSeen=Date.now();return JSON.stringify(S);}
 

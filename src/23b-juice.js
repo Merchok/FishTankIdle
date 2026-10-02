@@ -63,17 +63,7 @@ function waterTap(x,y){
   else ripple(x,y,15,{ry:0.5});
   sfx.tink();
   reactToGlass(x,y);
-  // Comb jellies keep their existing simple response; fish use the habits above.
-  for(const f of S.fish){
-    if(kindOf(f)!=='jelly'||!SP[f.sp].glide) continue;
-    const r=scene.rt.get(f.id);if(!r||r.sleep||f.sick) continue;
-    const d=Math.hypot(r.x-x,r.y-y);
-    if(f.trait==='shy'){
-      if(d<48){r.flee=0.9;r.wait=0;r.tx=clamp(r.x+(r.x-x)*3,8,152);r.ty=clamp(r.y+(r.y-y)*3,12,SAND_Y-10);}
-    }else if(d<95&&(f.trait!=='lazy'||Math.random()<0.3)){
-      r.tx=x;r.ty=clamp(y,10,SAND_Y-8);r.wait=0;r.chase=0;
-    }
-  }
+
 }
 
 /* ----- celebration events queued by the sim ----- */
