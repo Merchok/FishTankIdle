@@ -3,10 +3,11 @@
     bash build.sh
     python tests/fish_personality.py
 
-Uses a phone-sized touch browser. Scene time is advanced deterministically, while
-the economy timer is paused, so assertions do not depend on wall-clock timing,
-the time of day, or random swimming. Set PLAYWRIGHT_CHROMIUM_EXECUTABLE to use a
-specific browser; a system Chromium is used when Playwright's download is absent.
+Uses phone-sized touch browsers plus a desktop screenshot. Scene time advances
+deterministically while the economy timer is paused, so assertions do not depend
+on wall-clock timing, the time of day, or random swimming. Set
+PLAYWRIGHT_CHROMIUM_EXECUTABLE to use a specific browser; a system Chromium is
+used when Playwright's download is absent.
 """
 import asyncio
 import os
@@ -521,6 +522,12 @@ async def reduced_motion(browser, errors):
     context = await browser.new_context(viewport={'width': 320, 'height': 640},
                                         is_mobile=True, has_touch=True, reduced_motion='reduce')
     page = await boot(context, errors)
+    await screenshot_fixture(page)
+    await tap(page, 95, 30)
+    await page.evaluate('testStep(0.35)')
+    check('reduced-motion screenshot has no ripple or particle bursts',
+          await page.evaluate('REDUCED && scene.ripples.length===0 && scene.parts.length===0'))
+    await capture(page, 'fish-personality-reduced-motion.png')
     await reset(page)
     await tap(page, 95, 45)
     check('reduced-motion setting is detected', await page.evaluate('REDUCED'))
@@ -559,17 +566,85 @@ async def reduced_motion(browser, errors):
     await context.close()
 
 
-async def screenshots(page):
+async def screenshot_fixture(page):
+    # This is a synthetic tank in an isolated browser context, never a user save.
+    # Reset visual easing/ambient state left by earlier tests before reseeding it.
+    await page.evaluate("""() => {
+      scene.snow.length=0;
+      scene.vw=scene.va=scene.wipe=scene.swirl=scene.rinse=scene.pileN=null;
+      clearTimeout(toastTimer);$('#toast').hidden=true;
+    }""")
     await reset(page, decor=['kelp', 'rock', None, 'castle', 'redweed'], fish=[
-        {'trait': 'shy', 'x': 37, 'y': 79},
-        {'trait': 'bold', 'sp': 'guppy', 'x': 72, 'y': 45},
-        {'trait': 'social', 'sp': 'goldie', 'x': 115, 'y': 56},
-        {'sp': 'cherry', 'x': 65, 'y': 99},
+        {'trait': 'shy', 'x': 37, 'y': 65, 'fish': {'name': 'Moss'}},
+        {'trait': 'bold', 'sp': 'guppy', 'x': 72, 'y': 42, 'fish': {'name': 'Sunny'}},
+        {'trait': 'social', 'sp': 'goldie', 'x': 111, 'y': 64, 'fish': {'name': 'Goldie'}},
+        {'trait': 'shy', 'sp': 'cherry', 'x': 69, 'fish': {'name': 'Cherry'}},
+        {'trait': 'lazy', 'sp': 'moon', 'x': 124, 'y': 32, 'fish': {'name': 'Moon'}},
     ])
-    await page.screenshot(path=str(ROOT / 'tests' / 'fish-personality-tank.png'))
-    await page.evaluate("openSheet('fish',S.fish[0].id)")
-    check('fish details explain the favorite spot', 'Favorite spot' in await page.inner_text('#sheetPanel'))
-    await page.screenshot(path=str(ROOT / 'tests' / 'fish-personality-details.png'))
+    await page.evaluate('snapCoins();renderSoundBtn()')
+    check('screenshot tank contains fish, shrimp, and jellyfish',
+          await page.evaluate("['fish','shrimp','jelly'].every(kind=>S.fish.some(f=>kindOf(f)===kind && scene.rt.has(f.id)))"))
+
+
+async def capture(page, filename):
+    await page.evaluate("""async () => {
+      await document.fonts.ready;
+      // The harness stops requestAnimationFrame, so capture the fixture explicitly.
+      sceneStop();drawScene();
+      // DNA has its own animation loop, independent of the tank scene.
+      cancelAnimationFrame(hxRaf);hxRaf=0;hxPhase=0.6;
+      const helix=document.querySelector('.hx-svg');
+      if(helix&&hxRows) helix.innerHTML=helixInner(hxRows,hxPhase);
+    }""")
+    check(filename + ' has a painted tank canvas', await page.evaluate("""() => {
+      const pixels=scene.c.getImageData(0,0,scene.cv.width,scene.cv.height).data;
+      return pixels.some((value,index)=>index%4===3&&value>0);
+    }"""))
+    await page.screenshot(path=str(ROOT / 'tests' / filename), animations='disabled')
+    print('SCREENSHOT tests/' + filename)
+
+
+async def screenshots(page):
+    await screenshot_fixture(page)
+    check('phone screenshot layout has no horizontal overflow',
+          await page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
+    await capture(page, 'fish-personality-tank.png')
+    for kind, label, filename in [
+        ('fish', 'Favorite spot', 'fish-personality-details.png'),
+        ('shrimp', 'Favorite spot', 'fish-personality-shrimp-details.png'),
+        ('jelly', 'Favorite depth', 'fish-personality-jelly-details.png'),
+    ]:
+        await page.evaluate("""kind => {
+          openSheet('fish',S.fish.find(f=>kindOf(f)===kind).id);
+          $('#sheetPanel').scrollTop=0;
+        }""", kind)
+        text = await page.inner_text('#sheetPanel')
+        check(kind + ' details explain the favorite place and glass response',
+              label in text and 'Say hello' in text)
+        await capture(page, filename)
+        await page.locator('#sheetPanel').get_by_role('button', name='Close', exact=True).click()
+        check(kind + ' detail sheet closes', await page.locator('#sheet').is_hidden())
+    await tap(page, 95, 30)
+    await page.evaluate('testStep(0.35)')
+    check('glass-greeting screenshot includes an active response',
+          await page.evaluate('S.fish.some(f=>!!rtFor(f).greeting)'))
+    await capture(page, 'fish-personality-greeting.png')
+
+
+async def desktop_screenshot(browser, errors):
+    context = await browser.new_context(viewport={'width': 1280, 'height': 900})
+    try:
+        page = await boot(context, errors)
+        await screenshot_fixture(page)
+        check('desktop layout stays centered without horizontal overflow',
+              await page.evaluate("""() => {
+                const r=$('#app').getBoundingClientRect();
+                return document.documentElement.scrollWidth<=innerWidth && r.width<=560
+                  && Math.abs(r.left-(innerWidth-r.right))<2;
+              }"""))
+        await capture(page, 'fish-personality-desktop-tank.png')
+    finally:
+        await context.close()
 
 
 async def main():
@@ -583,14 +658,16 @@ async def main():
             context = await browser.new_context(viewport={'width': 390, 'height': 844},
                                                 is_mobile=True, has_touch=True)
             page = await boot(context, errors)
+            # Capture visual QA before behavioral failures can interrupt the run.
+            await screenshots(page)
+            await desktop_screenshot(browser, errors)
+            await reduced_motion(browser, errors)
             await favorites(page)
             await inhabitant_habits(page)
             await greetings(page)
             await nonfish_greetings(page)
             await priorities(page)
             await nonfish_priorities(page)
-            await screenshots(page)
-            await reduced_motion(browser, errors)
             check('no browser script errors', not errors, errors)
         finally:
             await browser.close()
